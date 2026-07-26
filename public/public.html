@@ -219,12 +219,27 @@ function renderForm(){
             <option value="" disabled selected>Select a role…</option>
             ${ROLES.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join("")}
           </select></label>
+        <label class="field"><span class="lab">Do you have any military experience? <span class="req">*</span></span>
+          <select name="military" id="military" required>
+            <option value="" disabled selected>Select one…</option>
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+          </select></label>
+        <label class="field" id="militaryDetailWrap" hidden><span class="lab">If yes, please explain</span>
+          <textarea name="military_detail" id="military_detail" maxlength="800" placeholder="Branch, years of service, role, relevant experience…"></textarea></label>
         <label class="field"><span class="lab">Anything we should know? <span style="color:var(--ink-soft);font-weight:400">(optional)</span></span>
           <textarea name="notes" maxlength="800" placeholder="Conflicts, experience, questions…"></textarea></label>
         <button class="btn btn-primary" type="submit" id="submit" ${open?"":"disabled"}>${open?"Confirm my audition":"All times are booked"}</button>
       </form>
     </div>`;
   $("#f").addEventListener("submit", submit);
+  const mil = $("#military");
+  if(mil) mil.addEventListener("change", ()=>{
+    const wrap = $("#militaryDetailWrap");
+    const show = mil.value === "Yes";
+    wrap.hidden = !show;
+    if(!show) $("#military_detail").value = "";
+  });
 }
 
 async function submit(e){
@@ -232,11 +247,14 @@ async function submit(e){
   if(submitting) return;
   const fd = new FormData(e.target);
   const body = { slot_id:fd.get("slot_id")||"", name:(fd.get("name")||"").trim(), email:(fd.get("email")||"").trim(),
-    phone:(fd.get("phone")||"").trim(), role:(fd.get("role")||"").trim(), notes:(fd.get("notes")||"").trim() };
+    phone:(fd.get("phone")||"").trim(), role:(fd.get("role")||"").trim(),
+    military:(fd.get("military")||"").trim(), military_detail:(fd.get("military_detail")||"").trim(),
+    notes:(fd.get("notes")||"").trim() };
   const msg = $("#formmsg"); msg.innerHTML="";
   if(!body.slot_id){ msg.innerHTML=`<div class="msg err">Please choose an audition time.</div>`; return; }
   if(!body.name){ msg.innerHTML=`<div class="msg err">Please enter your name.</div>`; return; }
   if(!body.email && !body.phone){ msg.innerHTML=`<div class="msg err">Please add an email or phone number.</div>`; return; }
+  if(!body.military){ msg.innerHTML=`<div class="msg err">Please answer the military experience question.</div>`; return; }
   submitting=true;
   const btn = $("#submit"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span>Confirming…`;
   try{
@@ -250,7 +268,10 @@ async function submit(e){
         $("#formmsg").innerHTML=`<div class="msg warn">That time was just booked by someone else. Please pick another open time — your other details are below.</div>`;
         // restore their typed details
         const f=$("#f"); if(f){ f.name.value=body.name; f.email.value=body.email; f.phone.value=body.phone;
-          if(body.role) f.role.value=body.role; f.notes.value=body.notes; }
+          if(body.role) f.role.value=body.role; f.notes.value=body.notes;
+          if(body.military){ f.military.value=body.military;
+            const wrap=$("#militaryDetailWrap"); wrap.hidden = body.military!=="Yes";
+            if(body.military==="Yes") $("#military_detail").value=body.military_detail; } }
         return;
       }
       msg.innerHTML=`<div class="msg err">${esc(j.error||"Something went wrong. Please try again.")}</div>`;

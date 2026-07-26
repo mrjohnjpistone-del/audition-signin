@@ -170,15 +170,19 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const slot_id = s(b.slot_id, 60), name = s(b.name, 120), email = s(b.email, 160),
             phone = s(b.phone, 40), role = s(b.role, 160), notes = s(b.notes, 800);
+      let military = s(b.military, 10); military = military === 'Yes' ? 'Yes' : military === 'No' ? 'No' : '';
+      const military_detail = military === 'Yes' ? s(b.military_detail, 800) : '';
       if (!name) return sendJson(res, 400, { error: 'Please enter your name.' });
       if (!email && !phone) return sendJson(res, 400, { error: 'Please add an email or phone so staff can reach you.' });
       if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return sendJson(res, 400, { error: 'That email address looks off — please check it.' });
+      if (!military) return sendJson(res, 400, { error: 'Please answer the military experience question.' });
       const slot = store.slots.find((x) => x.id === slot_id);
       if (!slot) return sendJson(res, 404, { error: 'That timeslot no longer exists.' });
       // Single-threaded Node: this check-then-insert is atomic (no await between them).
       if (isTaken(slot_id)) return sendJson(res, 409, { error: 'Sorry — someone just claimed that slot. Please pick another.' });
       store.signups.push({ id: uuid(), slot_id, name, email: email || null, phone: phone || null,
-        role: role || null, notes: notes || null, created_at: new Date().toISOString() });
+        role: role || null, military, military_detail: military_detail || null,
+        notes: notes || null, created_at: new Date().toISOString() });
       save();
       return sendJson(res, 200, { ok: true, slot_local: slot.slot_local, duration_min: slot.duration_min });
     }
@@ -193,7 +197,8 @@ const server = http.createServer(async (req, res) => {
         const slots = store.slots.slice().sort(byLocal).map((sl) => {
           const g = store.signups.find((x) => x.slot_id === sl.id);
           return { id: sl.id, slot_local: sl.slot_local, duration_min: sl.duration_min,
-            signup: g ? { id: g.id, name: g.name, email: g.email, phone: g.phone, role: g.role, notes: g.notes, created_at: g.created_at } : null };
+            signup: g ? { id: g.id, name: g.name, email: g.email, phone: g.phone, role: g.role,
+              military: g.military || null, military_detail: g.military_detail || null, notes: g.notes, created_at: g.created_at } : null };
         });
         const e = store.settings;
         return sendJson(res, 200, {

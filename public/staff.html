@@ -197,6 +197,7 @@ function renderRoster(){
               <div class="name">${esc(g.name)}</div>
               ${contacts.length?`<div class="contact">${contacts.join(" · ")}</div>`:`<div class="contact" style="color:var(--err)">no contact info</div>`}
               ${g.role?`<div class="role"><b>Reading for:</b> ${esc(g.role)}</div>`:""}
+              ${g.military?`<div class="role"><b>Military experience:</b> ${esc(g.military)}${g.military==="Yes"&&g.military_detail?` — ${esc(g.military_detail)}`:""}</div>`:""}
               ${g.notes?`<div class="rnotes">“${esc(g.notes)}”</div>`:""}
             </div>
             <span class="pill b">Booked</span>
@@ -266,11 +267,11 @@ async function removeSlot(id){
   catch(e){ toast(e.message); }
 }
 function exportCsv(){
-  const rows = [["Day","Time","Duration (min)","Status","Name","Email","Phone","Role","Notes","Signed up"]];
+  const rows = [["Day","Time","Duration (min)","Status","Name","Email","Phone","Role","Military experience","Military details","Notes","Signed up"]];
   for(const s of (STATE.slots||[])){
     const g = s.signup;
     rows.push([ fmtDay(s.slot_local), fmtTime(s.slot_local), s.duration_min, g?"Booked":"Open",
-      g?g.name:"", g&&g.email||"", g&&g.phone||"", g&&g.role||"", g&&g.notes||"", g?g.created_at:"" ]);
+      g?g.name:"", g&&g.email||"", g&&g.phone||"", g&&g.role||"", g&&g.military||"", g&&g.military_detail||"", g&&g.notes||"", g?g.created_at:"" ]);
   }
   const csv = rows.map(r=>r.map(c=>{ const v=String(c==null?"":c); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(",")).join("\r\n");
   const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
