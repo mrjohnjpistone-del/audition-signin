@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: audition-signin
+    runtime: node
+    plan: free
+    buildCommand: "true"        # nothing to build — zero dependencies
+    startCommand: node server.js
+    envVars:
+      - key: STAFF_KEY          # staff access key; change this to your own secret
+        sync: false
+      - key: DATA_DIR           # where the JSON data file lives (mounted disk)
+        value: /var/data
+    disk:
+      name: audition-data
+      mountPath: /var/data      # persists sign-ups across deploys & restarts
+      sizeGB: 1

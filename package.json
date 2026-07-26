@@ -1,0 +1,13 @@
+{
+  "name": "audition-signin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shareable audition sign-in form with a live staff roster. Zero dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Audition Roster · Staff</title>
+<style>
+  :root{
+    --bg:#f6efe4; --panel:#fffaf2; --panel-2:#f3e9d8; --ink:#241a12; --ink-soft:#6a5c4a;
+    --line:#e2d3ba; --gold:#b8862f; --gold-ink:#7a5410; --wine:#7a1f2b;
+    --ok:#2f6b46; --ok-bg:#e4f0e6; --err:#9a2530; --err-bg:#f7e4e2;
+    --open:#8a6a1f; --open-bg:#f4ead2; --booked:#2f6b46; --booked-bg:#e4f0e6;
+    --shadow:0 10px 40px rgba(50,30,10,.14); --radius:16px;
+    --serif:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#171310; --panel:#221b15; --panel-2:#2b221a; --ink:#f3e8d8; --ink-soft:#b7a58c;
+      --line:#3a2e22; --gold:#e0ad55; --gold-ink:#f0cd8b; --wine:#d98a94;
+      --ok:#8fd0a3; --ok-bg:#1d2a20; --err:#f0a7a1; --err-bg:#2c1a19;
+      --open:#e0b878; --open-bg:#2c2318; --booked:#8fd0a3; --booked-bg:#1d2a20;
+      --shadow:0 12px 44px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f6efe4; --panel:#fffaf2; --panel-2:#f3e9d8; --ink:#241a12; --ink-soft:#6a5c4a;
+    --line:#e2d3ba; --gold:#b8862f; --gold-ink:#7a5410; --wine:#7a1f2b;
+    --ok:#2f6b46; --ok-bg:#e4f0e6; --err:#9a2530; --err-bg:#f7e4e2;
+    --open:#8a6a1f; --open-bg:#f4ead2; --booked:#2f6b46; --booked-bg:#e4f0e6;
+    --shadow:0 10px 40px rgba(50,30,10,.14);
+  }
+  :root[data-theme="dark"]{
+    --bg:#171310; --panel:#221b15; --panel-2:#2b221a; --ink:#f3e8d8; --ink-soft:#b7a58c;
+    --line:#3a2e22; --gold:#e0ad55; --gold-ink:#f0cd8b; --wine:#d98a94;
+    --ok:#8fd0a3; --ok-bg:#1d2a20; --err:#f0a7a1; --err-bg:#2c1a19;
+    --open:#e0b878; --open-bg:#2c2318; --booked:#8fd0a3; --booked-bg:#1d2a20;
+    --shadow:0 12px 44px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.5; -webkit-font-smoothing:antialiased;
+    padding:max(14px,env(safe-area-inset-top)) 14px calc(40px + env(safe-area-inset-bottom))}
+  .wrap{max-width:920px; margin:0 auto}
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0}
+  .brand{font-family:var(--serif); font-weight:700; font-size:22px; display:flex; align-items:center; gap:10px}
+  .brand .badge{font-family:var(--sans); font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#fff; background:var(--wine); padding:3px 8px; border-radius:20px}
+  @media (prefers-color-scheme:dark){ .brand .badge{color:#1a1410} }
+  :root[data-theme="dark"] .brand .badge{color:#1a1410}
+  .live{display:flex; align-items:center; gap:7px; color:var(--ink-soft); font-size:13px}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--ok); animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px}
+  h1{font-family:var(--serif); font-size:28px; margin:0}
+  .sub{color:var(--ink-soft); font-size:14px; margin-top:4px}
+  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px}
+  .tile{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; text-align:center}
+  .tile .n{font-family:var(--serif); font-size:34px; font-weight:700; line-height:1}
+  .tile .l{font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin-top:6px}
+  .tile.booked .n{color:var(--booked)} .tile.open .n{color:var(--open)}
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px}
+  .btn{appearance:none; cursor:pointer; font:inherit; font-weight:600; font-size:14px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:10px 14px; transition:filter .15s, transform .06s}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--wine); color:#fff; border-color:transparent}
+  @media (prefers-color-scheme:dark){ .btn.primary{color:#1a1410} }
+  :root[data-theme="dark"] .btn.primary{color:#1a1410}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.danger{color:var(--err); border-color:color-mix(in srgb,var(--err) 40%,var(--line))}
+  .btn.small{padding:6px 10px; font-size:13px}
+  .daygroup+.daygroup{margin-top:8px}
+  .dayhdr{font-family:var(--serif); font-size:16px; font-weight:700; color:var(--gold-ink); margin:18px 0 8px; display:flex; align-items:center; gap:10px}
+  .dayhdr .count{font-family:var(--sans); font-size:12px; font-weight:600; color:var(--ink-soft)}
+  .row{display:flex; align-items:center; gap:14px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--panel)}
+  .row .time{flex:0 0 auto; width:96px; text-align:center}
+  .row .time .t{font-family:var(--serif); font-weight:700; font-size:17px}
+  .row .time .d{font-size:11px; color:var(--ink-soft)}
+  .row .who{flex:1 1 auto; min-width:0}
+  .row .name{font-weight:700; font-size:16px}
+  .row .contact{font-size:13px; color:var(--ink-soft); margin-top:2px; word-break:break-word}
+  .row .contact a{color:var(--gold-ink); text-decoration:none}
+  .row .role{font-size:13px; color:var(--ink); margin-top:3px}
+  .row .role b{color:var(--ink-soft); font-weight:600}
+  .row .rnotes{font-size:13px; color:var(--ink-soft); font-style:italic; margin-top:3px}
+  .row.free{border-style:dashed; opacity:.9}
+  .row.free .name{color:var(--open); font-weight:600; font-style:italic}
+  .pill{flex:0 0 auto; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:4px 10px; border-radius:20px}
+  .pill.b{background:var(--booked-bg); color:var(--booked)} .pill.o{background:var(--open-bg); color:var(--open)}
+  .actions{flex:0 0 auto; display:flex; gap:6px}
+  .empty{text-align:center; color:var(--ink-soft); padding:30px 10px}
+  /* gate */
+  .gate{max-width:400px; margin:8vh auto 0}
+  .gate h1{text-align:center; margin-bottom:6px}
+  .gate p{text-align:center; color:var(--ink-soft); font-size:14px; margin:0 0 18px}
+  input,textarea,select{width:100%; font:inherit; color:inherit; background:var(--panel-2); border:1.5px solid var(--line); border-radius:10px; padding:12px 14px; -webkit-appearance:none}
+  input:focus,textarea:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 22%,transparent)}
+  label.field{display:block; margin-bottom:14px}
+  label.field .lab{display:block; font-size:13px; font-weight:600; margin-bottom:6px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .msg{border-radius:10px; padding:11px 14px; margin-bottom:14px; font-size:14px; font-weight:600}
+  .msg.err{background:var(--err-bg); color:var(--err)} .msg.ok{background:var(--ok-bg); color:var(--ok)}
+  /* modal */
+  .scrim{position:fixed; inset:0; background:rgba(20,12,4,.55); display:grid; place-items:center; padding:16px; z-index:50}
+  .modal{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); width:100%; max-width:460px; max-height:90vh; overflow:auto; padding:22px}
+  .modal h3{font-family:var(--serif); margin:0 0 4px; font-size:22px}
+  .modal .mhint{color:var(--ink-soft); font-size:13px; margin:0 0 16px}
+  .modal-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:6px}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:12px 18px; border-radius:12px; font-size:14px; font-weight:600; box-shadow:var(--shadow); z-index:80; opacity:0; transition:opacity .2s, transform .2s}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px)}
+  @media (max-width:560px){ .tiles{gap:8px} .tile{padding:12px} .tile .n{font-size:26px} .row{flex-wrap:wrap} .row .time{width:auto} .grid2{grid-template-columns:1fr} .actions{width:100%; justify-content:flex-end} }
+  @media (prefers-reduced-motion:reduce){ .dot{animation:none} }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s,r=document)=>r.querySelector(s);
+const root = $("#root");
+const KEYNAME = "audition_staff_key";
+let KEY = localStorage.getItem(KEYNAME) || (new URLSearchParams(location.search).get("key")||"");
+let STATE = null, timer = null;
+
+function esc(t){ return String(t==null?"":t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmtDay(local){ const [d]=local.split("T"); const dt=new Date(d+"T00:00:00");
+  return dt.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}); }
+function fmtTime(local){ const [,t]=local.split("T"); let[h,m]=t.split(":").map(Number);
+  const ap=h>=12?"PM":"AM"; h=h%12||12; return h+":"+String(m).padStart(2,"0")+" "+ap; }
+function dayKey(local){ return local.split("T")[0]; }
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+
+async function api(path, opts={}){
+  opts.headers = Object.assign({"x-staff-key":KEY}, opts.headers||{});
+  if(opts.body && typeof opts.body!=="string"){ opts.headers["Content-Type"]="application/json"; opts.body=JSON.stringify(opts.body); }
+  const r = await fetch(path, opts);
+  if(r.status===401){ KEY=""; localStorage.removeItem(KEYNAME); stopPoll(); renderGate("That key wasn't accepted. Try again."); throw new Error("unauthorized"); }
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error||"Request failed");
+  return j;
+}
+
+/* ---------- gate ---------- */
+function renderGate(err){
+  stopPoll();
+  root.innerHTML = `
+    <div class="topbar"><div class="brand">Audition Roster <span class="badge">Staff</span></div></div>
+    <div class="gate card">
+      <h1>Staff access</h1>
+      <p>Enter the access key the casting lead shared with you.</p>
+      ${err?`<div class="msg err">${esc(err)}</div>`:""}
+      <form id="gate">
+        <label class="field"><span class="lab">Access key</span>
+          <input id="key" type="password" autocomplete="off" autofocus placeholder="key"></label>
+        <button class="btn primary" style="width:100%" type="submit">Open roster</button>
+      </form>
+    </div>`;
+  $("#gate").addEventListener("submit", async e=>{
+    e.preventDefault();
+    KEY = $("#key").value.trim();
+    if(!KEY) return;
+    try{ await refresh(); localStorage.setItem(KEYNAME,KEY); startPoll(); }
+    catch(_){ /* handled in api() */ }
+  });
+}
+
+/* ---------- roster ---------- */
+async function refresh(){
+  const data = await api("/api/staff/roster");
+  STATE = data;
+  renderRoster();
+}
+function renderRoster(){
+  const ev = STATE.event||{}, slots = STATE.slots||[], c = STATE.counts||{total:0,booked:0};
+  const open = c.total - c.booked;
+  const days = []; const byDay = {};
+  for(const s of slots){ const k=dayKey(s.slot_local); if(!byDay[k]){byDay[k]=[]; days.push(k);} byDay[k].push(s); }
+
+  let body = "";
+  if(!slots.length){
+    body = `<div class="card"><div class="empty"><div style="font-weight:600;margin-bottom:4px">No timeslots yet</div>Use “Add slots” to post audition times, then share the sign-up link.</div></div>`;
+  } else {
+    body = `<div class="card">`;
+    for(const k of days){
+      const bcount = byDay[k].filter(s=>s.signup).length;
+      body += `<div class="daygroup"><div class="dayhdr">${esc(fmtDay(k+"T00:00"))} <span class="count">${bcount}/${byDay[k].length} booked</span></div>`;
+      for(const s of byDay[k]){
+        const g = s.signup;
+        if(g){
+          const contacts = [];
+          if(g.email) contacts.push(`<a href="mailto:${esc(g.email)}">${esc(g.email)}</a>`);
+          if(g.phone) contacts.push(`<a href="tel:${esc(g.phone)}">${esc(g.phone)}</a>`);
+          body += `<div class="row">
+            <div class="time"><div class="t">${esc(fmtTime(s.slot_local))}</div><div class="d">${s.duration_min} min</div></div>
+            <div class="who">
+              <div class="name">${esc(g.name)}</div>
+              ${contacts.length?`<div class="contact">${contacts.join(" · ")}</div>`:`<div class="contact" style="color:var(--err)">no contact info</div>`}
+              ${g.role?`<div class="role"><b>Reading for:</b> ${esc(g.role)}</div>`:""}
+              ${g.notes?`<div class="rnotes">“${esc(g.notes)}”</div>`:""}
+            </div>
+            <span class="pill b">Booked</span>
+            <div class="actions"><button class="btn small danger" data-cancel="${esc(g.id)}">Cancel</button></div>
+          </div>`;
+        } else {
+          body += `<div class="row free">
+            <div class="time"><div class="t">${esc(fmtTime(s.slot_local))}</div><div class="d">${s.duration_min} min</div></div>
+            <div class="who"><div class="name">Open</div></div>
+            <span class="pill o">Open</span>
+            <div class="actions"><button class="btn small danger" data-slot="${esc(s.id)}">Remove</button></div>
+          </div>`;
+        }
+      }
+      body += `</div>`;
+    }
+    body += `</div>`;
+  }
+
+  root.innerHTML = `
+    <div class="topbar">
+      <div class="brand">Audition Roster <span class="badge">Staff</span></div>
+      <div class="live"><span class="dot"></span> Live · auto-refresh</div>
+    </div>
+    <div class="card" style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+      <div><h1>${esc(ev.title||"Auditions")}</h1>
+      <div class="sub">${ev.subtitle?esc(ev.subtitle)+" · ":""}${ev.location?"📍 "+esc(ev.location):"No location set"}</div></div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="n">${c.total}</div><div class="l">Total slots</div></div>
+      <div class="tile booked"><div class="n">${c.booked}</div><div class="l">Booked</div></div>
+      <div class="tile open"><div class="n">${open}</div><div class="l">Open</div></div>
+    </div>
+    <div class="toolbar">
+      <button class="btn primary" id="add">＋ Add slots</button>
+      <button class="btn" id="share">🔗 Copy sign-up link</button>
+      <button class="btn" id="csv">⬇ Export CSV</button>
+      <button class="btn" id="edit">✎ Edit event</button>
+      <button class="btn" id="rekey">🔑 Change key</button>
+    </div>
+    ${body}`;
+
+  $("#add").addEventListener("click", modalAdd);
+  $("#share").addEventListener("click", shareLink);
+  $("#csv").addEventListener("click", exportCsv);
+  $("#edit").addEventListener("click", modalEdit);
+  $("#rekey").addEventListener("click", modalKey);
+  root.querySelectorAll("[data-cancel]").forEach(b=>b.addEventListener("click",()=>cancelSignup(b.dataset.cancel)));
+  root.querySelectorAll("[data-slot]").forEach(b=>b.addEventListener("click",()=>removeSlot(b.dataset.slot)));
+}
+
+/* ---------- actions ---------- */
+function shareLink(){
+  const link = location.origin + "/";
+  navigator.clipboard.writeText(link).then(()=>toast("Sign-up link copied")).catch(()=>{
+    prompt("Copy the public sign-up link:", link);
+  });
+}
+async function cancelSignup(id){
+  if(!confirm("Cancel this sign-up? The slot will reopen for others.")) return;
+  try{ await api("/api/staff/signups/"+encodeURIComponent(id),{method:"DELETE"}); toast("Sign-up cancelled"); refresh(); }
+  catch(e){ toast(e.message); }
+}
+async function removeSlot(id){
+  if(!confirm("Remove this open timeslot?")) return;
+  try{ await api("/api/staff/slots/"+encodeURIComponent(id),{method:"DELETE"}); toast("Slot removed"); refresh(); }
+  catch(e){ toast(e.message); }
+}
+function exportCsv(){
+  const rows = [["Day","Time","Duration (min)","Status","Name","Email","Phone","Role","Notes","Signed up"]];
+  for(const s of (STATE.slots||[])){
+    const g = s.signup;
+    rows.push([ fmtDay(s.slot_local), fmtTime(s.slot_local), s.duration_min, g?"Booked":"Open",
+      g?g.name:"", g&&g.email||"", g&&g.phone||"", g&&g.role||"", g&&g.notes||"", g?g.created_at:"" ]);
+  }
+  const csv = rows.map(r=>r.map(c=>{ const v=String(c==null?"":c); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(",")).join("\r\n");
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a"); a.href=URL.createObjectURL(blob);
+  const t=(STATE.event&&STATE.event.title||"auditions").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
+  a.download = t+"-roster.csv"; a.click(); URL.revokeObjectURL(a.href);
+  toast("CSV downloaded");
+}
+
+/* ---------- modals ---------- */
+function openModal(html){
+  const scrim = document.createElement("div"); scrim.className="scrim";
+  scrim.innerHTML = `<div class="modal">${html}</div>`;
+  scrim.addEventListener("mousedown",e=>{ if(e.target===scrim) close(); });
+  document.body.appendChild(scrim);
+  function close(){ scrim.remove(); document.removeEventListener("keydown",onkey); }
+  function onkey(e){ if(e.key==="Escape") close(); }
+  document.addEventListener("keydown",onkey);
+  return { scrim, close };
+}
+function modalAdd(){
+  const today = STATE.slots&&STATE.slots[0] ? dayKey(STATE.slots[0].slot_local) : "";
+  const m = openModal(`
+    <h3>Add audition slots</h3>
+    <p class="mhint">Generate a run of back-to-back slots for one day. Times are the venue's local time — exactly what everyone sees.</p>
+    <div id="amsg"></div>
+    <label class="field"><span class="lab">Date</span><input id="a_date" type="date" value="${esc(today)}"></label>
+    <div class="grid2">
+      <label class="field"><span class="lab">Start time</span><input id="a_start" type="time" value="18:00"></label>
+      <label class="field"><span class="lab">End time</span><input id="a_end" type="time" value="21:00"></label>
+    </div>
+    <label class="field"><span class="lab">Minutes per slot</span><input id="a_dur" type="number" min="1" max="240" value="10"></label>
+    <div class="modal-actions">
+      <button class="btn" id="a_cancel">Cancel</button>
+      <button class="btn primary" id="a_go">Generate slots</button>
+    </div>`);
+  $("#a_cancel").addEventListener("click", m.close);
+  $("#a_go").addEventListener("click", async ()=>{
+    const date=$("#a_date").value, start=$("#a_start").value, end=$("#a_end").value, duration_min=parseInt($("#a_dur").value,10);
+    if(!date||!start||!end){ $("#amsg").innerHTML=`<div class="msg err">Fill in date, start and end.</div>`; return; }
+    try{
+      const j = await api("/api/staff/slots",{method:"POST",body:{date,start,end,duration_min}});
+      m.close(); toast(`Added ${j.created} slot${j.created!==1?"s":""}${j.skipped?` (${j.skipped} already existed)`:""}`); refresh();
+    }catch(e){ $("#amsg").innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+  });
+}
+function modalEdit(){
+  const e = STATE.event||{};
+  const m = openModal(`
+    <h3>Edit event</h3>
+    <p class="mhint">This is what people see on the public sign-up page.</p>
+    <div id="emsg"></div>
+    <label class="field"><span class="lab">Title</span><input id="e_title" maxlength="160" value="${esc(e.title||"")}"></label>
+    <label class="field"><span class="lab">Subtitle / show</span><input id="e_sub" maxlength="200" value="${esc(e.subtitle||"")}"></label>
+    <label class="field"><span class="lab">Location</span><input id="e_loc" maxlength="300" value="${esc(e.location||"")}"></label>
+    <label class="field"><span class="lab">Note (arrival info, what to prepare…)</span><textarea id="e_notes" maxlength="1000">${esc(e.notes||"")}</textarea></label>
+    <div class="modal-actions">
+      <button class="btn" id="e_cancel">Cancel</button>
+      <button class="btn primary" id="e_go">Save</button>
+    </div>`);
+  $("#e_cancel").addEventListener("click", m.close);
+  $("#e_go").addEventListener("click", async ()=>{
+    try{
+      await api("/api/staff/settings",{method:"POST",body:{
+        title:$("#e_title").value, subtitle:$("#e_sub").value, location:$("#e_loc").value, notes:$("#e_notes").value }});
+      m.close(); toast("Event updated"); refresh();
+    }catch(err){ $("#emsg").innerHTML=`<div class="msg err">${esc(err.message)}</div>`; }
+  });
+}
+function modalKey(){
+  const m = openModal(`
+    <h3>Change access key</h3>
+    <p class="mhint">Everyone using the old key will be signed out. Share the new key with your team.</p>
+    <div id="kmsg"></div>
+    <label class="field"><span class="lab">New access key (min 6 characters)</span><input id="k_new" autocomplete="off" value=""></label>
+    <div class="modal-actions">
+      <button class="btn" id="k_cancel">Cancel</button>
+      <button class="btn primary" id="k_go">Update key</button>
+    </div>`);
+  $("#k_cancel").addEventListener("click", m.close);
+  $("#k_go").addEventListener("click", async ()=>{
+    const nk=$("#k_new").value.trim();
+    if(nk.length<6){ $("#kmsg").innerHTML=`<div class="msg err">At least 6 characters.</div>`; return; }
+    try{
+      await api("/api/staff/key",{method:"POST",body:{new_key:nk}});
+      KEY=nk; localStorage.setItem(KEYNAME,nk);
+      m.close(); toast("Access key updated"); refresh();
+    }catch(err){ $("#kmsg").innerHTML=`<div class="msg err">${esc(err.message)}</div>`; }
+  });
+}
+
+/* ---------- polling ---------- */
+function startPoll(){ stopPoll(); timer=setInterval(()=>{ refresh().catch(()=>{}); },12000); }
+function stopPoll(){ if(timer){clearInterval(timer); timer=null;} }
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && KEY && STATE) refresh().catch(()=>{}); });
+
+/* ---------- boot ---------- */
+(async function(){
+  if(KEY){
+    try{ await refresh(); localStorage.setItem(KEYNAME,KEY); startPoll(); }
+    catch(_){ if(!KEY) renderGate(); }
+  } else renderGate();
+})();
+</script>
+</body>
+</html>

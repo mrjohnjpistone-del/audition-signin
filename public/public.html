@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Audition Sign-In</title>
+<style>
+  :root{
+    --bg:#f6efe4; --panel:#fffaf2; --panel-2:#f3e9d8; --ink:#241a12; --ink-soft:#6a5c4a;
+    --line:#e2d3ba; --gold:#b8862f; --gold-ink:#7a5410; --wine:#7a1f2b; --wine-ink:#5c1620;
+    --ok:#2f6b46; --ok-bg:#e4f0e6; --err:#9a2530; --err-bg:#f7e4e2;
+    --open:#2f6b46; --open-bg:#e6f0e6; --taken:#9a6a1f; --taken-bg:#f4e9d4;
+    --shadow:0 10px 40px rgba(50,30,10,.14); --radius:16px;
+    --serif:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#171310; --panel:#221b15; --panel-2:#2b221a; --ink:#f3e8d8; --ink-soft:#b7a58c;
+      --line:#3a2e22; --gold:#e0ad55; --gold-ink:#f0cd8b; --wine:#d98a94; --wine-ink:#eab6bc;
+      --ok:#8fd0a3; --ok-bg:#1d2a20; --err:#f0a7a1; --err-bg:#2c1a19;
+      --open:#8fd0a3; --open-bg:#1d2a20; --taken:#e0b878; --taken-bg:#2c2318;
+      --shadow:0 12px 44px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f6efe4; --panel:#fffaf2; --panel-2:#f3e9d8; --ink:#241a12; --ink-soft:#6a5c4a;
+    --line:#e2d3ba; --gold:#b8862f; --gold-ink:#7a5410; --wine:#7a1f2b; --wine-ink:#5c1620;
+    --ok:#2f6b46; --ok-bg:#e4f0e6; --err:#9a2530; --err-bg:#f7e4e2;
+    --open:#2f6b46; --open-bg:#e6f0e6; --taken:#9a6a1f; --taken-bg:#f4e9d4;
+    --shadow:0 10px 40px rgba(50,30,10,.14);
+  }
+  :root[data-theme="dark"]{
+    --bg:#171310; --panel:#221b15; --panel-2:#2b221a; --ink:#f3e8d8; --ink-soft:#b7a58c;
+    --line:#3a2e22; --gold:#e0ad55; --gold-ink:#f0cd8b; --wine:#d98a94; --wine-ink:#eab6bc;
+    --ok:#8fd0a3; --ok-bg:#1d2a20; --err:#f0a7a1; --err-bg:#2c1a19;
+    --open:#8fd0a3; --open-bg:#1d2a20; --taken:#e0b878; --taken-bg:#2c2318;
+    --shadow:0 12px 44px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+    padding:max(16px,env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:640px; margin:0 auto}
+  header.masthead{text-align:center; padding:22px 0 10px}
+  .eyebrow{font-family:var(--sans); text-transform:uppercase; letter-spacing:.28em; font-size:11px;
+    color:var(--gold-ink); font-weight:700; margin-bottom:10px}
+  h1{font-family:var(--serif); font-weight:700; font-size:clamp(30px,7vw,44px); margin:0; text-wrap:balance; line-height:1.08}
+  .subtitle{color:var(--ink-soft); font-family:var(--serif); font-style:italic; font-size:clamp(15px,3.4vw,19px); margin-top:8px}
+  .meta{display:flex; flex-wrap:wrap; gap:8px 16px; justify-content:center; margin-top:14px; color:var(--ink-soft); font-size:14px}
+  .meta span{display:inline-flex; align-items:center; gap:6px}
+  .rule{height:1px; background:linear-gradient(90deg,transparent,var(--line) 15%,var(--line) 85%,transparent); margin:20px 0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px}
+  .step-label{display:flex; align-items:center; gap:10px; font-family:var(--serif); font-size:20px; font-weight:700; margin:0 0 4px}
+  .step-num{flex:0 0 auto; width:28px; height:28px; border-radius:50%; background:var(--wine); color:#fff; display:grid; place-items:center; font-family:var(--sans); font-size:14px; font-weight:700}
+  @media (prefers-color-scheme:dark){ .step-num{color:#1a1410} }
+  :root[data-theme="dark"] .step-num{color:#1a1410}
+  .hint{color:var(--ink-soft); font-size:14px; margin:2px 0 16px 38px}
+  .slots{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+  .slot{appearance:none; text-align:left; cursor:pointer; font:inherit; color:inherit;
+    background:var(--panel-2); border:1.5px solid var(--line); border-radius:12px; padding:12px 14px; transition:transform .06s ease, border-color .15s ease, box-shadow .15s}
+  .slot:hover:not(:disabled){border-color:var(--gold); box-shadow:0 4px 14px rgba(120,80,20,.14)}
+  .slot:active:not(:disabled){transform:translateY(1px)}
+  .slot .day{font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.06em}
+  .slot .time{font-family:var(--serif); font-size:20px; font-weight:700; margin-top:2px}
+  .slot .dur{font-size:12px; color:var(--ink-soft); margin-top:2px}
+  .slot.sel{border-color:var(--wine); background:var(--panel); box-shadow:0 0 0 3px color-mix(in srgb,var(--wine) 22%,transparent)}
+  .slot:disabled{opacity:.5; cursor:not-allowed}
+  .slot .tag{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--taken-bg); color:var(--taken)}
+  .daygroup + .daygroup{margin-top:18px}
+  .dayhdr{font-family:var(--serif); font-size:15px; font-weight:700; color:var(--gold-ink); margin:0 0 8px; padding-bottom:6px; border-bottom:1px solid var(--line)}
+  label.field{display:block; margin-bottom:14px}
+  label.field .lab{display:block; font-size:13px; font-weight:600; margin-bottom:6px}
+  label.field .req{color:var(--wine)}
+  input,textarea{width:100%; font:inherit; color:inherit; background:var(--panel-2); border:1.5px solid var(--line); border-radius:10px; padding:12px 14px; -webkit-appearance:none}
+  input:focus,textarea:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 22%,transparent)}
+  textarea{min-height:80px; resize:vertical}
+  .chosen{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--panel-2); border:1px dashed var(--gold); border-radius:12px; padding:12px 14px; margin-bottom:16px}
+  .chosen .t{font-family:var(--serif); font-weight:700; font-size:18px}
+  .btn{appearance:none; cursor:pointer; font:inherit; font-weight:700; border-radius:12px; border:1px solid transparent; padding:14px 20px; width:100%; transition:transform .06s ease, filter .15s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--wine); color:#fff}
+  @media (prefers-color-scheme:dark){ .btn-primary{color:#1a1410} }
+  :root[data-theme="dark"] .btn-primary{color:#1a1410}
+  .btn-primary:hover{filter:brightness(1.06)}
+  .btn-ghost{background:transparent; color:var(--ink-soft); border-color:var(--line); width:auto; padding:8px 14px; font-weight:600; font-size:14px}
+  .btn:disabled{opacity:.55; cursor:not-allowed}
+  .msg{border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:14px; font-weight:600}
+  .msg.err{background:var(--err-bg); color:var(--err)}
+  .empty{text-align:center; color:var(--ink-soft); padding:26px 10px}
+  .ticket{text-align:center; padding:12px 6px}
+  .ticket .stamp{width:64px; height:64px; border-radius:50%; background:var(--ok-bg); color:var(--ok); display:grid; place-items:center; margin:6px auto 14px; font-size:34px}
+  .ticket h2{font-family:var(--serif); font-size:28px; margin:0 0 6px}
+  .ticket .big{font-family:var(--serif); font-size:26px; font-weight:700; color:var(--wine); margin:14px 0 2px}
+  .ticket .who{color:var(--ink-soft); margin-bottom:18px}
+  .foot{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:8px}
+  .foot a{color:var(--gold-ink)}
+  .spin{display:inline-block; width:16px; height:16px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){ .spin{animation:none} .btn:active,.slot:active{transform:none} }
+  .refresh{display:flex; align-items:center; justify-content:center; gap:8px; color:var(--ink-soft); font-size:13px; margin-top:2px}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 60%,transparent); animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow" id="eyebrow">Now Casting</div>
+    <h1 id="title">Auditions</h1>
+    <div class="subtitle" id="subtitle" hidden></div>
+    <div class="meta" id="meta"></div>
+  </header>
+  <div class="rule"></div>
+
+  <div id="app"><div class="card"><div class="empty">Loading available times…</div></div></div>
+
+  <div class="foot">
+    Times shown are local to the audition venue. Trouble signing up? Contact the casting team directly.
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (s,r=document)=>r.querySelector(s);
+const app = $("#app");
+let DATA = null, selected = null, refreshTimer = null, submitting = false;
+
+function esc(t){ return String(t==null?"":t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmtDay(local){ const [d]=local.split("T"); const dt=new Date(d+"T00:00:00");
+  return dt.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}); }
+function fmtTime(local){ const [,t]=local.split("T"); let[h,m]=t.split(":").map(Number);
+  const ap=h>=12?"PM":"AM"; h=h%12||12; return h+":"+String(m).padStart(2,"0")+" "+ap; }
+function dayKey(local){ return local.split("T")[0]; }
+
+async function load(){
+  try{
+    const r = await fetch("/api/public",{cache:"no-store"});
+    if(!r.ok) throw new Error();
+    DATA = await r.json();
+    paintHeader();
+    if(!selected && !submitting) render();
+  }catch(e){
+    if(!DATA) app.innerHTML = `<div class="card"><div class="empty">Couldn't load audition times. Please refresh the page.</div></div>`;
+  }
+}
+function paintHeader(){
+  const ev = DATA.event||{};
+  $("#title").textContent = ev.title || "Auditions";
+  const sub = $("#subtitle");
+  if(ev.subtitle){ sub.textContent = ev.subtitle; sub.hidden=false; } else sub.hidden=true;
+  const meta = $("#meta"); meta.innerHTML="";
+  if(ev.location) meta.insertAdjacentHTML("beforeend",`<span>📍 ${esc(ev.location)}</span>`);
+  if(ev.notes) meta.insertAdjacentHTML("beforeend",`<span>📝 ${esc(ev.notes)}</span>`);
+}
+
+function render(){
+  const slots = (DATA.slots||[]);
+  const open = slots.filter(s=>!s.taken);
+  if(!slots.length){
+    app.innerHTML = `<div class="card"><div class="empty"><div style="font-size:15px;font-weight:600;margin-bottom:4px">No times posted yet</div>Check back soon — the casting team is still setting the schedule.</div></div>`;
+    return;
+  }
+  // group by day
+  const days = [];
+  const byDay = {};
+  for(const s of slots){ const k=dayKey(s.slot_local); if(!byDay[k]){byDay[k]=[]; days.push(k);} byDay[k].push(s); }
+  let inner = "";
+  for(const k of days){
+    inner += `<div class="daygroup"><div class="dayhdr">${esc(fmtDay(k+"T00:00"))}</div><div class="slots">`;
+    for(const s of byDay[k]){
+      inner += `<button class="slot" data-id="${esc(s.id)}" ${s.taken?"disabled":""}>
+        <div class="time">${esc(fmtTime(s.slot_local))}</div>
+        <div class="dur">${s.duration_min} min</div>
+        ${s.taken?`<span class="tag">Taken</span>`:""}
+      </button>`;
+    }
+    inner += `</div></div>`;
+  }
+  app.innerHTML = `
+    <div class="card">
+      <div class="step-label"><span class="step-num">1</span> Choose your time</div>
+      <div class="hint">${open.length} of ${slots.length} slot${slots.length!==1?"s":""} still open. Tap a time to claim it.</div>
+      ${inner}
+      <div class="refresh"><span class="dot"></span> Live — updates automatically</div>
+    </div>`;
+  app.querySelectorAll(".slot:not(:disabled)").forEach(b=>{
+    b.addEventListener("click",()=>{ const s=DATA.slots.find(x=>x.id===b.dataset.id); if(s) choose(s); });
+  });
+}
+
+function choose(slot){
+  selected = slot;
+  stopPoll();
+  app.innerHTML = `
+    <div class="card">
+      <div class="step-label"><span class="step-num">2</span> Your details</div>
+      <div class="hint">Just so the casting team knows who's coming and how to reach you.</div>
+      <div class="chosen">
+        <div><div style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em">Your slot</div>
+        <div class="t">${esc(fmtDay(slot.slot_local))} · ${esc(fmtTime(slot.slot_local))}</div></div>
+        <button class="btn btn-ghost" id="change">Change</button>
+      </div>
+      <div id="formmsg"></div>
+      <form id="f">
+        <label class="field"><span class="lab">Full name <span class="req">*</span></span>
+          <input name="name" autocomplete="name" maxlength="120" required></label>
+        <label class="field"><span class="lab">Email</span>
+          <input name="email" type="email" autocomplete="email" maxlength="160" inputmode="email"></label>
+        <label class="field"><span class="lab">Phone</span>
+          <input name="phone" type="tel" autocomplete="tel" maxlength="40" inputmode="tel"></label>
+        <div class="hint" style="margin:-8px 0 14px 0">Add at least one — email or phone — so we can reach you.</div>
+        <label class="field"><span class="lab">Role / part you're reading for</span>
+          <input name="role" maxlength="160"></label>
+        <label class="field"><span class="lab">Anything we should know?</span>
+          <textarea name="notes" maxlength="800"></textarea></label>
+        <button class="btn btn-primary" type="submit" id="submit">Confirm my audition slot</button>
+      </form>
+    </div>`;
+  $("#change").addEventListener("click",()=>{ selected=null; render(); startPoll(); });
+  $("#f").addEventListener("submit",submit);
+}
+
+async function submit(e){
+  e.preventDefault();
+  if(submitting) return;
+  const form = e.target;
+  const fd = new FormData(form);
+  const body = { slot_id:selected.id, name:(fd.get("name")||"").trim(), email:(fd.get("email")||"").trim(),
+    phone:(fd.get("phone")||"").trim(), role:(fd.get("role")||"").trim(), notes:(fd.get("notes")||"").trim() };
+  const msg = $("#formmsg"); msg.innerHTML="";
+  if(!body.name){ msg.innerHTML=`<div class="msg err">Please enter your name.</div>`; return; }
+  if(!body.email && !body.phone){ msg.innerHTML=`<div class="msg err">Please add an email or phone number.</div>`; return; }
+  submitting = true;
+  const btn = $("#submit"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span>Confirming…`;
+  try{
+    const r = await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){
+      msg.innerHTML=`<div class="msg err">${esc(j.error||"Something went wrong. Please try again.")}</div>`;
+      btn.disabled=false; btn.innerHTML="Confirm my audition slot"; submitting=false;
+      if(r.status===409||r.status===404){ // slot gone — offer to reselect
+        setTimeout(()=>{ selected=null; submitting=false; load().then(()=>{render(); startPoll();}); },1600);
+      }
+      return;
+    }
+    ticket(body, j);
+  }catch(err){
+    msg.innerHTML=`<div class="msg err">Network problem — please check your connection and try again.</div>`;
+    btn.disabled=false; btn.innerHTML="Confirm my audition slot"; submitting=false;
+  }
+}
+
+function ticket(body,j){
+  submitting=false;
+  const local = j.slot_local || selected.slot_local;
+  app.innerHTML = `
+    <div class="card ticket">
+      <div class="stamp">✓</div>
+      <h2>You're on the list</h2>
+      <div style="color:var(--ink-soft)">Your audition slot is confirmed.</div>
+      <div class="big">${esc(fmtDay(local))}</div>
+      <div class="big" style="margin-top:0">${esc(fmtTime(local))}</div>
+      <div class="who">${esc(body.name)}${j.duration_min?` · ${j.duration_min} min`:""}</div>
+      <div class="hint" style="margin-left:0">Please arrive a few minutes early. Take a screenshot of this for your records.</div>
+      <button class="btn btn-ghost" id="again" style="margin:14px auto 0">Sign someone else up</button>
+    </div>`;
+  selected=null;
+  $("#again").addEventListener("click",()=>{ load().then(()=>{render(); startPoll();}); });
+}
+
+function startPoll(){ stopPoll(); refreshTimer=setInterval(load,20000); }
+function stopPoll(){ if(refreshTimer){clearInterval(refreshTimer); refreshTimer=null;} }
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && !selected && !submitting) load(); });
+
+load().then(()=>{ if(!selected) render(); startPoll(); });
+</script>
+</body>
+</html>
