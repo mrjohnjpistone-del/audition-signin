@@ -29,11 +29,31 @@ const PUBLIC_DIR  = path.join(__dirname, 'public');
 const DEFAULT_KEY = process.env.STAFF_KEY || 'GRZonptDh8QY';
 
 // ── Storage: one JSON file, atomic writes, serialized so writes never interleave ──
+// Build back-to-back slots for one day: local wall-clock 'YYYY-MM-DDTHH:MM' strings.
+function genSlots(date, startMin, endMin, dur) {
+  const out = [];
+  for (let cur = startMin; cur + dur <= endMin; cur += dur) {
+    const hh = String(Math.floor(cur / 60)).padStart(2, '0');
+    const mm = String(cur % 60).padStart(2, '0');
+    out.push({ id: crypto.randomUUID(), slot_local: `${date}T${hh}:${mm}`, duration_min: dur });
+  }
+  return out;
+}
+
+// First-run defaults. On a brand-new deploy (empty disk) the app already shows the
+// real event — nothing to configure. Everything here is editable from the staff page.
 function freshStore() {
   return {
-    settings: { title: 'Auditions', subtitle: '', location: '', notes: '', staff_key: DEFAULT_KEY },
-    slots: [],    // { id, slot_local:'YYYY-MM-DDTHH:MM', duration_min }
-    signups: [],  // { id, slot_id, name, email, phone, role, notes, created_at }
+    settings: {
+      title: 'A Few Good Men — Auditions',
+      subtitle: 'Rialto Community Art Center',
+      location: 'Rialto Community Art Center · 215 E. Broadway Street, Morrilton, AR',
+      notes: 'Actors are encouraged to prepare a two-minute dramatic monologue, but a prepared monologue is not required. Auditions will also include cold readings from the script.',
+      staff_key: DEFAULT_KEY,
+    },
+    // Tuesday, August 4, 2026 · 6:00–9:00 PM · 10-minute slots (18 total)
+    slots: genSlots('2026-08-04', 18 * 60, 21 * 60, 10),
+    signups: [], // { id, slot_id, name, email, phone, role, notes, created_at }
   };
 }
 function load() {
