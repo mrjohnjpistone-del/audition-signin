@@ -88,6 +88,27 @@
   .pill.b{background:var(--booked-bg); color:var(--booked)} .pill.o{background:var(--open-bg); color:var(--open)}
   .actions{flex:0 0 auto; display:flex; gap:6px}
   .empty{text-align:center; color:var(--ink-soft); padding:30px 10px}
+  /* walk-in sign-in cards */
+  .sectionhdr{display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:10px; margin:6px 0 14px}
+  .sectionhdr h2{font-family:var(--serif); font-size:22px; margin:0}
+  .sectionhdr .sh-sub{color:var(--ink-soft); font-size:13px}
+  .cards{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media (max-width:640px){ .cards{grid-template-columns:1fr} }
+  .ci{border:1px solid var(--line); border-radius:14px; padding:15px 16px; background:var(--panel); position:relative}
+  .ci .ci-top{display:flex; align-items:flex-start; gap:10px; justify-content:space-between}
+  .ci .ci-name{font-family:var(--serif); font-weight:700; font-size:18px; line-height:1.15}
+  .ci .ci-when{font-size:11px; color:var(--ink-soft); white-space:nowrap; margin-top:3px}
+  .ci .ci-contact{font-size:13px; color:var(--ink-soft); margin-top:2px; word-break:break-word}
+  .ci .ci-contact a{color:var(--gold-ink); text-decoration:none}
+  .ci dl{margin:12px 0 0; display:grid; grid-template-columns:auto 1fr; gap:5px 12px; font-size:13px}
+  .ci dt{color:var(--ink-soft); font-weight:600}
+  .ci dd{margin:0; color:var(--ink)}
+  .ci .tags{display:flex; flex-wrap:wrap; gap:5px; margin-top:3px}
+  .ci .tag{font-size:11px; font-weight:600; background:var(--panel-2); border:1px solid var(--line); border-radius:16px; padding:2px 9px}
+  .ci .conflict{color:var(--err)} .ci .clear{color:var(--booked)}
+  .ci .ci-mail{display:inline-block; margin-top:2px; font-size:11px; font-weight:700; color:var(--booked); background:var(--booked-bg); border-radius:16px; padding:2px 9px}
+  .ci .ci-del{position:absolute; top:12px; right:12px}
+  .ci .ci-notes{font-size:13px; color:var(--ink-soft); font-style:italic; margin-top:10px}
   /* gate */
   .gate{max-width:400px; margin:8vh auto 0}
   .gate h1{text-align:center; margin-bottom:6px}
@@ -130,15 +151,18 @@ function fmtTime(local){ const [,t]=local.split("T"); let[h,m]=t.split(":").map(
   const ap=h>=12?"PM":"AM"; h=h%12||12; return h+":"+String(m).padStart(2,"0")+" "+ap; }
 function dayKey(local){ return local.split("T")[0]; }
 function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
-function shortDate(d){ const dt=new Date(d+"T00:00:00"); return dt.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
-// Human-readable one-liner of a signup's rehearsal conflicts (requirement A)
+function shortDate(d){ const dt=new Date(d+"T00:00:00");
+  return dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }
+function fmtStamp(iso){ try{ const dt=new Date(iso);
+  return dt.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}); }catch(e){ return ""; } }
+// Human-readable rehearsal-conflict summary for one sign-in (requirement A).
 function conflictText(g){
-  if(g.conflict_none) return "No known conflicts";
+  if(g.conflict_none) return `<span class="clear">No known conflicts</span>`;
   const parts=[];
-  if(g.conflict_weekdays&&g.conflict_weekdays.length) parts.push("every "+g.conflict_weekdays.map(d=>d.slice(0,3)).join(", "));
-  if(g.conflict_dates&&g.conflict_dates.length) parts.push(g.conflict_dates.map(shortDate).join(", "));
-  if(g.conflict_notes) parts.push(g.conflict_notes);
-  return parts.join(" · ");
+  if(g.conflict_weekdays&&g.conflict_weekdays.length) parts.push(`<span class="conflict">Never: ${g.conflict_weekdays.map(esc).join(", ")}</span>`);
+  if(g.conflict_dates&&g.conflict_dates.length) parts.push(`<span class="conflict">Dates: ${g.conflict_dates.map(shortDate).map(esc).join(", ")}</span>`);
+  if(g.conflict_notes) parts.push(esc(g.conflict_notes));
+  return parts.length?parts.join("<br>"):`<span style="color:var(--ink-soft)">—</span>`;
 }
 
 async function api(path, opts={}){
@@ -183,6 +207,7 @@ async function refresh(){
 }
 function renderRoster(){
   const ev = STATE.event||{}, slots = STATE.slots||[], c = STATE.counts||{total:0,booked:0};
+  const checkins = STATE.checkins||[];
   const open = c.total - c.booked;
   const days = []; const byDay = {};
   for(const s of slots){ const k=dayKey(s.slot_local); if(!byDay[k]){byDay[k]=[]; days.push(k);} byDay[k].push(s); }
@@ -207,14 +232,7 @@ function renderRoster(){
               <div class="name">${esc(g.name)}</div>
               ${contacts.length?`<div class="contact">${contacts.join(" · ")}</div>`:`<div class="contact" style="color:var(--err)">no contact info</div>`}
               ${g.role?`<div class="role"><b>Reading for:</b> ${esc(g.role)}</div>`:""}
-              ${g.ensemble?`<div class="role"><b>Ensemble:</b> ${esc(g.ensemble)}</div>`:""}
               ${g.military?`<div class="role"><b>Military experience:</b> ${esc(g.military)}${g.military==="Yes"&&g.military_detail?` — ${esc(g.military_detail)}`:""}</div>`:""}
-              ${(g.conflict_none||(g.conflict_weekdays&&g.conflict_weekdays.length)||(g.conflict_dates&&g.conflict_dates.length)||g.conflict_notes)?`<div class="role"><b>Availability:</b> ${esc(conflictText(g))}</div>`:""}
-              ${g.crew_interests&&g.crew_interests.length?`<div class="role"><b>Crew if not cast:</b> ${esc(g.crew_interests.join(", "))}</div>`:""}
-              ${g.stage_experience?`<div class="role"><b>Stage experience:</b> ${esc(g.stage_experience)}</div>`:""}
-              ${g.training?`<div class="role"><b>Training:</b> ${esc(g.training)}</div>`:""}
-              ${g.emergency_name||g.emergency_phone?`<div class="role"><b>Emergency:</b> ${esc(g.emergency_name||"")}${g.emergency_phone?` · ${esc(g.emergency_phone)}`:""}</div>`:""}
-              ${g.mailing_list==="Yes"?`<div class="role"><b>✉ Mailing list</b></div>`:""}
               ${g.notes?`<div class="rnotes">“${esc(g.notes)}”</div>`:""}
             </div>
             <span class="pill b">Booked</span>
@@ -234,6 +252,51 @@ function renderRoster(){
     body += `</div>`;
   }
 
+  // ── Walk-in audition sign-ins (from the /signin form) ──────────────────────
+  let ciBody = `
+    <div class="sectionhdr">
+      <div><h2>Audition Sign-Ins <span style="font-family:var(--sans);font-size:15px;color:var(--wine)">(${checkins.length})</span></h2>
+        <div class="sh-sub">People who signed in at the audition — newest first.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn small" id="cicsv">⬇ Export sign-ins CSV</button>
+      </div>
+    </div>`;
+  if(!checkins.length){
+    ciBody += `<div class="card"><div class="empty"><div style="font-weight:600;margin-bottom:4px">No sign-ins yet</div>As people fill out the sign-in form, they'll appear here live.</div></div>`;
+  } else {
+    ciBody += `<div class="cards">` + checkins.map(g=>{
+      const contacts = [];
+      if(g.email) contacts.push(`<a href="mailto:${esc(g.email)}">${esc(g.email)}</a>`);
+      if(g.phone) contacts.push(`<a href="tel:${esc(g.phone)}">${esc(g.phone)}</a>`);
+      const crew = (g.crew_interests&&g.crew_interests.length)
+        ? `<div class="tags">${g.crew_interests.map(x=>`<span class="tag">${esc(x)}</span>`).join("")}</div>` : `—`;
+      const rows = [];
+      rows.push([`Role`, g.role?esc(g.role):`—`]);
+      rows.push([`Ensemble?`, g.ensemble?esc(g.ensemble):`—`]);
+      rows.push([`Military`, g.military?(esc(g.military)+(g.military==="Yes"&&g.military_detail?` — ${esc(g.military_detail)}`:"")):`—`]);
+      rows.push([`Availability`, conflictText(g)]);
+      if(g.stage_experience) rows.push([`Stage exp.`, esc(g.stage_experience)]);
+      if(g.training) rows.push([`Training`, esc(g.training)]);
+      rows.push([`Crew help`, crew]);
+      if(g.emergency_name||g.emergency_phone){
+        const em = [g.emergency_name?esc(g.emergency_name):"", g.emergency_phone?`<a href="tel:${esc(g.emergency_phone)}">${esc(g.emergency_phone)}</a>`:""].filter(Boolean).join(" · ");
+        rows.push([`Emergency`, em]);
+      }
+      return `<div class="ci">
+        <button class="btn small danger ci-del" data-ci="${esc(g.id)}">Remove</button>
+        <div class="ci-top"><div>
+          <div class="ci-name">${esc(g.name)}</div>
+          ${contacts.length?`<div class="ci-contact">${contacts.join(" · ")}</div>`:`<div class="ci-contact" style="color:var(--err)">no contact info</div>`}
+          ${g.mailing_list?`<span class="ci-mail">✉ Mailing list</span>`:""}
+        </div></div>
+        <dl>${rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join("")}</dl>
+        ${g.notes?`<div class="ci-notes">“${esc(g.notes)}”</div>`:""}
+        <div class="ci-when">Signed in ${esc(fmtStamp(g.created_at))}</div>
+      </div>`;
+    }).join("") + `</div>`;
+  }
+  body += ciBody;
+
   root.innerHTML = `
     <div class="topbar">
       <div class="brand">Audition Roster <span class="badge">Staff</span></div>
@@ -251,6 +314,7 @@ function renderRoster(){
     <div class="toolbar">
       <button class="btn primary" id="add">＋ Add slots</button>
       <button class="btn" id="share">🔗 Copy sign-up link</button>
+      <button class="btn" id="sharein">🎭 Copy sign-in link</button>
       <button class="btn" id="csv">⬇ Export CSV</button>
       <button class="btn" id="edit">✎ Edit event</button>
       <button class="btn" id="rekey">🔑 Change key</button>
@@ -259,11 +323,14 @@ function renderRoster(){
 
   $("#add").addEventListener("click", modalAdd);
   $("#share").addEventListener("click", shareLink);
+  $("#sharein").addEventListener("click", shareSigninLink);
   $("#csv").addEventListener("click", exportCsv);
   $("#edit").addEventListener("click", modalEdit);
   $("#rekey").addEventListener("click", modalKey);
   root.querySelectorAll("[data-cancel]").forEach(b=>b.addEventListener("click",()=>cancelSignup(b.dataset.cancel)));
   root.querySelectorAll("[data-slot]").forEach(b=>b.addEventListener("click",()=>removeSlot(b.dataset.slot)));
+  root.querySelectorAll("[data-ci]").forEach(b=>b.addEventListener("click",()=>removeCheckin(b.dataset.ci)));
+  const ciBtn = $("#cicsv"); if(ciBtn) ciBtn.addEventListener("click", exportCheckinsCsv);
 }
 
 /* ---------- actions ---------- */
@@ -271,6 +338,12 @@ function shareLink(){
   const link = location.origin + "/";
   navigator.clipboard.writeText(link).then(()=>toast("Sign-up link copied")).catch(()=>{
     prompt("Copy the public sign-up link:", link);
+  });
+}
+function shareSigninLink(){
+  const link = location.origin + "/signin";
+  navigator.clipboard.writeText(link).then(()=>toast("Sign-in link copied")).catch(()=>{
+    prompt("Copy the audition sign-in link:", link);
   });
 }
 async function cancelSignup(id){
@@ -284,16 +357,11 @@ async function removeSlot(id){
   catch(e){ toast(e.message); }
 }
 function exportCsv(){
-  const rows = [["Day","Time","Duration (min)","Status","Name","Email","Phone","Role","Ensemble",
-    "Military experience","Military details","Availability / conflicts","Crew if not cast",
-    "Stage experience","Training","Emergency name","Emergency phone","Mailing list","Notes","Signed up"]];
+  const rows = [["Day","Time","Duration (min)","Status","Name","Email","Phone","Role","Military experience","Military details","Notes","Signed up"]];
   for(const s of (STATE.slots||[])){
     const g = s.signup;
     rows.push([ fmtDay(s.slot_local), fmtTime(s.slot_local), s.duration_min, g?"Booked":"Open",
-      g?g.name:"", g&&g.email||"", g&&g.phone||"", g&&g.role||"", g&&g.ensemble||"",
-      g&&g.military||"", g&&g.military_detail||"", g?conflictText(g):"", g&&g.crew_interests&&g.crew_interests.join("; ")||"",
-      g&&g.stage_experience||"", g&&g.training||"", g&&g.emergency_name||"", g&&g.emergency_phone||"", g&&g.mailing_list||"",
-      g&&g.notes||"", g?g.created_at:"" ]);
+      g?g.name:"", g&&g.email||"", g&&g.phone||"", g&&g.role||"", g&&g.military||"", g&&g.military_detail||"", g&&g.notes||"", g?g.created_at:"" ]);
   }
   const csv = rows.map(r=>r.map(c=>{ const v=String(c==null?"":c); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(",")).join("\r\n");
   const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
@@ -301,6 +369,29 @@ function exportCsv(){
   const t=(STATE.event&&STATE.event.title||"auditions").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
   a.download = t+"-roster.csv"; a.click(); URL.revokeObjectURL(a.href);
   toast("CSV downloaded");
+}
+async function removeCheckin(id){
+  if(!confirm("Remove this sign-in? This can't be undone.")) return;
+  try{ await api("/api/staff/checkins/"+encodeURIComponent(id),{method:"DELETE"}); toast("Sign-in removed"); refresh(); }
+  catch(e){ toast(e.message); }
+}
+function exportCheckinsCsv(){
+  const rows = [["Signed in","Name","Email","Phone","Preferred role","Ensemble?","Military experience","Military details",
+    "No conflicts","Weeknight conflicts","Conflict dates","Availability notes","Stage experience","Training",
+    "Crew interest","Emergency name","Emergency phone","Mailing list","Notes"]];
+  for(const g of (STATE.checkins||[])){
+    rows.push([ g.created_at||"", g.name||"", g.email||"", g.phone||"", g.role||"", g.ensemble||"",
+      g.military||"", g.military_detail||"",
+      g.conflict_none?"Yes":"No", (g.conflict_weekdays||[]).join("; "), (g.conflict_dates||[]).join("; "),
+      g.conflict_notes||"", g.stage_experience||"", g.training||"", (g.crew_interests||[]).join("; "),
+      g.emergency_name||"", g.emergency_phone||"", g.mailing_list?"Yes":"No", g.notes||"" ]);
+  }
+  const csv = rows.map(r=>r.map(c=>{ const v=String(c==null?"":c); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(",")).join("\r\n");
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a"); a.href=URL.createObjectURL(blob);
+  const t=(STATE.event&&STATE.event.title||"auditions").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
+  a.download = t+"-sign-ins.csv"; a.click(); URL.revokeObjectURL(a.href);
+  toast("Sign-ins CSV downloaded");
 }
 
 /* ---------- modals ---------- */

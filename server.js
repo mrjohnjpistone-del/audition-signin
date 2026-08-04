@@ -5,12 +5,14 @@
 //
 // No framework, no database service, nothing to `npm install`. Runs on any Node 18+.
 //
-//   PUBLIC PAGE   GET  /                     the sign-up form
+//   PUBLIC PAGE   GET  /                     the sign-up form (book a timeslot)
+//   SIGN-IN PAGE  GET  /signin               walk-in sign-in form (used at the audition)
 //   STAFF PAGE    GET  /staff                the roster (asks for the access key)
 //
 //   PUBLIC API    GET  /api/public           event info + slot availability (no names)
 //                 POST /api/signup           claim a slot
-//   STAFF API     GET    /api/staff/roster        full roster w/ names + contacts
+//                 POST /api/checkin          walk-in audition sign-in (no slot)
+//   STAFF API     GET    /api/staff/roster        full roster w/ names + contacts + sign-ins
 //                 POST   /api/staff/slots         add slots (range-generate or list)
 //                 DELETE /api/staff/slots/:id     remove a slot
 //                 DELETE /api/staff/signups/:id   cancel a signup (reopens the slot)
@@ -53,11 +55,12 @@ function freshStore() {
     },
     // Tuesday, August 4, 2026 · 6:00–9:00 PM · 10-minute slots (18 total)
     slots: genSlots('2026-08-04', 18 * 60, 21 * 60, 10),
-    // { id, slot_id, name, email, phone, role, military, military_detail, ensemble,
-    //   stage_experience, training, conflict_none, conflict_weekdays[], conflict_dates[],
-    //   conflict_notes, crew_interests[], emergency_name, emergency_phone, mailing_list,
-    //   notes, created_at }
-    signups: [],
+    signups: [], // { id, slot_id, name, email, phone, role, military, military_detail, notes, created_at }
+    // Walk-in audition sign-ins (the /signin form). One record per person who auditions.
+    // { id, name, email, phone, role, military, military_detail, ensemble, stage_experience,
+    //   training, conflict_none, conflict_weekdays[], conflict_dates[], conflict_notes,
+    //   crew_interests[], emergency_name, emergency_phone, mailing_list, notes, created_at }
+    checkins: [],
   };
 }
 function load() {
@@ -67,6 +70,7 @@ function load() {
     if (!d.settings.staff_key) d.settings.staff_key = DEFAULT_KEY;
     d.slots = Array.isArray(d.slots) ? d.slots : [];
     d.signups = Array.isArray(d.signups) ? d.signups : [];
+    d.checkins = Array.isArray(d.checkins) ? d.checkins : [];
     return d;
   } catch (e) {
     return freshStore();
@@ -125,6 +129,35 @@ function allowSignup(ip) {
   return true;
 }
 
+// ── Check-in rate limit: kiosk-friendly. Many people sign in from ONE network at
+// the venue, so this is far more generous than the signup limit — it only exists
+// to stop a runaway loop, not to gate a busy sign-in table. 300 / hour / IP.
+const checkinHits = new Map();
+function allowCheckin(ip) {
+  const now = Date.now(), win = 3600000, max = 300;
+  const arr = (checkinHits.get(ip) || []).filter((t) => now - t < win);
+  if (arr.length >= max) { checkinHits.set(ip, arr); return false; }
+  arr.push(now); checkinHits.set(ip, arr);
+  if (checkinHits.size > 20000) for (const [k, v] of checkinHits) if (v.every((t) => now - t > win)) checkinHits.delete(k);
+  return true;
+}
+
+// Normalize a submitted list of strings against an allowed set (checkboxes / multi-select).
+function pickList(raw, allowed, maxLen) {
+  if (!Array.isArray(raw)) return [];
+  const set = allowed ? new Set(allowed) : null;
+  const out = [];
+  for (const v of raw) {
+    const t = s(v, maxLen || 120);
+    if (!t) continue;
+    if (set && !set.has(t)) continue;
+    if (!out.includes(t)) out.push(t);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
 // ── Static page serving ──────────────────────────────────────────────────────
 function sendFile(res, file, type) {
   fs.readFile(path.join(PUBLIC_DIR, file), (err, buf) => {
@@ -150,6 +183,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // Pages
     if (method === 'GET' && p === '/') return sendFile(res, 'public.html', 'text/html; charset=utf-8');
+    if (method === 'GET' && p === '/signin') return sendFile(res, 'signin.html', 'text/html; charset=utf-8');
     if (method === 'GET' && (p === '/staff' || p === '/admin')) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       return sendFile(res, 'staff.html', 'text/html; charset=utf-8');
@@ -176,22 +210,6 @@ const server = http.createServer(async (req, res) => {
             phone = s(b.phone, 40), role = s(b.role, 160), notes = s(b.notes, 800);
       let military = s(b.military, 10); military = military === 'Yes' ? 'Yes' : military === 'No' ? 'No' : '';
       const military_detail = military === 'Yes' ? s(b.military_detail, 800) : '';
-      // ── New audition-registration fields (A–G) ──────────────────────────────
-      let ensemble = s(b.ensemble, 10); ensemble = ensemble === 'Yes' ? 'Yes' : ensemble === 'No' ? 'No' : '';
-      const stage_experience = s(b.stage_experience, 1200);
-      const training = s(b.training, 800);
-      const emergency_name = s(b.emergency_name, 120);
-      const emergency_phone = s(b.emergency_phone, 40);
-      const mailing_list = s(b.mailing_list, 10) === 'Yes' ? 'Yes' : 'No';
-      const conflict_none = b.conflict_none === true || b.conflict_none === 'true';
-      const WEEKDAYS = /^(Monday|Tuesday|Wednesday|Thursday|Friday)$/;
-      const conflict_weekdays = Array.isArray(b.conflict_weekdays)
-        ? b.conflict_weekdays.map((x) => s(x, 12)).filter((x) => WEEKDAYS.test(x)).slice(0, 5) : [];
-      const conflict_dates = Array.isArray(b.conflict_dates)
-        ? [...new Set(b.conflict_dates.map((x) => s(x, 10)).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)))].sort().slice(0, 120) : [];
-      const conflict_notes = s(b.conflict_notes, 800);
-      const crew_interests = Array.isArray(b.crew_interests)
-        ? [...new Set(b.crew_interests.map((x) => s(x, 60)).filter(Boolean))].slice(0, 30) : [];
       if (!name) return sendJson(res, 400, { error: 'Please enter your name.' });
       if (!email && !phone) return sendJson(res, 400, { error: 'Please add an email or phone so staff can reach you.' });
       if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return sendJson(res, 400, { error: 'That email address looks off — please check it.' });
@@ -202,12 +220,49 @@ const server = http.createServer(async (req, res) => {
       if (isTaken(slot_id)) return sendJson(res, 409, { error: 'Sorry — someone just claimed that slot. Please pick another.' });
       store.signups.push({ id: uuid(), slot_id, name, email: email || null, phone: phone || null,
         role: role || null, military, military_detail: military_detail || null,
-        ensemble: ensemble || null, stage_experience: stage_experience || null, training: training || null,
-        conflict_none: !!conflict_none, conflict_weekdays, conflict_dates, conflict_notes: conflict_notes || null,
-        crew_interests, emergency_name: emergency_name || null, emergency_phone: emergency_phone || null,
-        mailing_list, notes: notes || null, created_at: new Date().toISOString() });
+        notes: notes || null, created_at: new Date().toISOString() });
       save();
       return sendJson(res, 200, { ok: true, slot_local: slot.slot_local, duration_min: slot.duration_min });
+    }
+
+    // Walk-in audition sign-in. No slot — one record per person who shows up to audition.
+    if (method === 'POST' && p === '/api/checkin') {
+      if (!allowCheckin(clientIp(req)))
+        return sendJson(res, 429, { error: 'Too many sign-ins from this network right now. Please wait a moment and try again.' });
+      const b = await readBody(req);
+      const name = s(b.name, 120), email = s(b.email, 160), phone = s(b.phone, 40),
+            role = s(b.role, 160), notes = s(b.notes, 800);
+      let military = s(b.military, 10); military = military === 'Yes' ? 'Yes' : military === 'No' ? 'No' : '';
+      const military_detail = military === 'Yes' ? s(b.military_detail, 800) : '';
+      let ensemble = s(b.ensemble, 20);
+      ensemble = ['Yes', 'No', 'Only role'].includes(ensemble) ? ensemble : '';
+      const stage_experience = s(b.stage_experience, 1500);
+      const training = s(b.training, 1500);
+      const conflict_none = b.conflict_none === true || b.conflict_none === 'true';
+      const conflict_weekdays = conflict_none ? [] : pickList(b.conflict_weekdays, WEEKDAYS, 12);
+      const conflict_dates = conflict_none ? [] : pickList(b.conflict_dates, null, 10)
+        .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x));
+      const conflict_notes = conflict_none ? '' : s(b.conflict_notes, 800);
+      const crew_interests = pickList(b.crew_interests, null, 60);
+      const emergency_name = s(b.emergency_name, 120);
+      const emergency_phone = s(b.emergency_phone, 40);
+      const mailing_list = b.mailing_list === true || b.mailing_list === 'true';
+
+      if (!name) return sendJson(res, 400, { error: 'Please enter your name.' });
+      if (!email && !phone) return sendJson(res, 400, { error: 'Please add an email or phone so staff can reach you.' });
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return sendJson(res, 400, { error: 'That email address looks off — please check it.' });
+      if (!military) return sendJson(res, 400, { error: 'Please answer the military experience question.' });
+
+      store.checkins.push({
+        id: uuid(), name, email: email || null, phone: phone || null, role: role || null,
+        military, military_detail: military_detail || null,
+        ensemble: ensemble || null, stage_experience: stage_experience || null, training: training || null,
+        conflict_none, conflict_weekdays, conflict_dates, conflict_notes: conflict_notes || null,
+        crew_interests, emergency_name: emergency_name || null, emergency_phone: emergency_phone || null,
+        mailing_list, notes: notes || null, created_at: new Date().toISOString(),
+      });
+      save();
+      return sendJson(res, 200, { ok: true, name });
     }
 
     // ── STAFF API (all require the key) ─────────────────────────────────────
@@ -221,17 +276,25 @@ const server = http.createServer(async (req, res) => {
           const g = store.signups.find((x) => x.slot_id === sl.id);
           return { id: sl.id, slot_local: sl.slot_local, duration_min: sl.duration_min,
             signup: g ? { id: g.id, name: g.name, email: g.email, phone: g.phone, role: g.role,
-              military: g.military || null, military_detail: g.military_detail || null,
-              ensemble: g.ensemble || null, stage_experience: g.stage_experience || null, training: g.training || null,
-              conflict_none: !!g.conflict_none, conflict_weekdays: g.conflict_weekdays || [], conflict_dates: g.conflict_dates || [],
-              conflict_notes: g.conflict_notes || null, crew_interests: g.crew_interests || [],
-              emergency_name: g.emergency_name || null, emergency_phone: g.emergency_phone || null,
-              mailing_list: g.mailing_list || null, notes: g.notes, created_at: g.created_at } : null };
+              military: g.military || null, military_detail: g.military_detail || null, notes: g.notes, created_at: g.created_at } : null };
         });
+        const checkins = store.checkins.slice()
+          .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0)) // newest first
+          .map((c) => ({
+            id: c.id, name: c.name, email: c.email, phone: c.phone, role: c.role,
+            military: c.military || null, military_detail: c.military_detail || null,
+            ensemble: c.ensemble || null, stage_experience: c.stage_experience || null, training: c.training || null,
+            conflict_none: !!c.conflict_none, conflict_weekdays: c.conflict_weekdays || [],
+            conflict_dates: c.conflict_dates || [], conflict_notes: c.conflict_notes || null,
+            crew_interests: c.crew_interests || [], emergency_name: c.emergency_name || null,
+            emergency_phone: c.emergency_phone || null, mailing_list: !!c.mailing_list,
+            notes: c.notes || null, created_at: c.created_at,
+          }));
         const e = store.settings;
         return sendJson(res, 200, {
           event: { title: e.title, subtitle: e.subtitle, location: e.location, notes: e.notes },
-          slots, counts: { total: slots.length, booked: slots.filter((x) => x.signup).length },
+          slots, checkins,
+          counts: { total: slots.length, booked: slots.filter((x) => x.signup).length, checkins: checkins.length },
         });
       }
 
@@ -286,6 +349,14 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true, deleted: before - store.signups.length });
       }
 
+      if (method === 'DELETE' && p.startsWith('/api/staff/checkins/')) {
+        const id = decodeURIComponent(p.slice('/api/staff/checkins/'.length));
+        const before = store.checkins.length;
+        store.checkins = store.checkins.filter((c) => c.id !== id);
+        save();
+        return sendJson(res, 200, { ok: true, deleted: before - store.checkins.length });
+      }
+
       if (method === 'POST' && p === '/api/staff/settings') {
         const b = await readBody(req);
         store.settings.title = s(b.title, 160) || 'Auditions';
@@ -323,6 +394,7 @@ function byLocal(a, b) { return a.slot_local < b.slot_local ? -1 : a.slot_local 
 server.listen(PORT, () => {
   console.log(`Audition Sign-In running on http://localhost:${PORT}`);
   console.log(`  Public form : http://localhost:${PORT}/`);
+  console.log(`  Sign-in form: http://localhost:${PORT}/signin`);
   console.log(`  Staff roster: http://localhost:${PORT}/staff   (key: ${store.settings.staff_key})`);
   console.log(`  Data file   : ${DATA_FILE}`);
 });

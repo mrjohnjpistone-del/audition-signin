@@ -5,9 +5,15 @@ can claim an open timeslot from any phone or computer, on any network. Staff ope
 a key-protected roster from anywhere and watch names and contact info appear in
 real time.
 
-- **Public page** `/` — pick a time, enter name + contact, done.
-- **Staff page** `/staff` — enter the access key, see every slot with who booked it,
-  add slots, export CSV, edit the event, rotate the key.
+- **Sign-up page** `/` — book an audition timeslot in advance. Pick a time, enter
+  name + contact, done. (Use this for scheduling future auditions.)
+- **Sign-in page** `/signin` — a walk-in intake form used *at* the audition. No
+  timeslot: everyone who shows up fills in their details, availability, crew
+  interest, ensemble willingness, emergency contact, and mailing-list opt-in.
+  Built for kiosk use — after each person it resets for the next.
+- **Staff page** `/staff` — enter the access key, watch both the booked timeslots
+  **and** the live walk-in sign-ins appear in real time. Add slots, export a CSV
+  for each list, edit the event, rotate the key.
 
 No database service. No Google Calendar. No `npm install` — it's plain Node.js,
 so there's nothing to break on deploy. Sign-ups persist to a JSON file on disk.
@@ -43,8 +49,9 @@ You only need to do three things:
 3. **Click Apply / Create.** In ~1 minute you get a public URL like
    `https://audition-signin.onrender.com`.
 
-That's it. Share the **base URL** with auditioners; give your team the same URL
-with `/staff` on the end plus the staff key.
+That's it. Share the **base URL** for advance booking, or the **`/signin` URL**
+for the walk-in form at the audition itself; give your team the same URL with
+`/staff` on the end plus the staff key.
 
 > Free Render web services sleep after ~15 min of inactivity and take a few
 > seconds to wake on the next visit. Sign-ups are never lost (they're on the
