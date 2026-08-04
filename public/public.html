@@ -96,6 +96,40 @@
   .spin{display:inline-block; width:16px; height:16px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; margin-right:8px}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){ .spin,.dot{animation:none} .btn:active{transform:none} }
+  /* section dividers within the form */
+  .section-label{font-family:var(--serif); font-size:16px; font-weight:700; color:var(--gold-ink);
+    margin:26px 0 4px; padding-top:16px; border-top:1px solid var(--line); display:flex; align-items:baseline; gap:8px}
+  .section-label:first-of-type{border-top:none; padding-top:0; margin-top:6px}
+  .section-hint{color:var(--ink-soft); font-size:13px; margin:0 0 14px}
+  .optional{color:var(--ink-soft); font-weight:400; font-size:12px; font-style:italic}
+  /* weekday toggle chips */
+  .days{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:12px}
+  .day{cursor:pointer; text-align:center; font-size:13px; font-weight:600; padding:11px 4px; border-radius:10px;
+    border:1.5px solid var(--line); background:var(--panel-2); color:var(--ink-soft); user-select:none; transition:all .12s}
+  .day input{position:absolute; opacity:0; width:0; height:0}
+  .day.on{background:var(--wine); color:#fff; border-color:transparent}
+  @media (prefers-color-scheme:dark){ .day.on{color:#1a1410} }
+  :root[data-theme="dark"] .day.on{color:#1a1410}
+  /* checkbox grid (crew roles) */
+  .checkgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px}
+  @media (max-width:440px){ .checkgrid{grid-template-columns:1fr} }
+  .check{display:flex; align-items:center; gap:10px; cursor:pointer; padding:11px 12px; border-radius:10px;
+    border:1.5px solid var(--line); background:var(--panel-2); font-size:14px; user-select:none; transition:border-color .12s, background .12s}
+  .check:has(input:checked){border-color:var(--gold); background:color-mix(in srgb,var(--gold) 12%,var(--panel-2))}
+  .check input{width:18px; height:18px; flex:0 0 auto; accent-color:var(--wine); -webkit-appearance:auto; appearance:auto; margin:0}
+  .check.full{grid-column:1/-1}
+  /* date-conflict adder + chips */
+  .dateadd{display:flex; gap:8px; margin-bottom:10px}
+  .dateadd input{flex:1 1 auto}
+  .dateadd .btn{width:auto; padding:0 18px; flex:0 0 auto}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px}
+  .chip{display:inline-flex; align-items:center; gap:8px; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:20px; padding:6px 8px 6px 13px; font-size:13px; font-weight:600}
+  .chip button{appearance:none; border:none; background:var(--line); color:var(--ink); cursor:pointer;
+    width:20px; height:20px; border-radius:50%; font-size:14px; line-height:1; display:grid; place-items:center; padding:0}
+  .chip button:hover{background:var(--wine); color:#fff}
+  .nonebox{margin:2px 0 14px}
+  .subfields{transition:opacity .15s} .subfields.dim{opacity:.4; pointer-events:none}
 </style>
 </head>
 <body>
@@ -136,7 +170,31 @@ const ROLES = [
   "Open to any role",
 ];
 
+// Behind-the-scenes roles for the "if not cast" multi-select (requirement B)
+const CREW = [
+  "Wherever I'm needed",
+  "Set construction",
+  "Set painting / scenic art",
+  "Stage crew / running crew",
+  "Props",
+  "Lighting",
+  "Sound",
+  "Costumes / wardrobe",
+  "Hair & makeup",
+  "Usher / front of house",
+  "Box office / tickets",
+  "Concessions",
+  "Publicity / social media",
+  "Photography / videography",
+  "Stage management",
+  "Program / graphic design",
+];
+const WEEKDAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
+// Rehearsal window for the conflict picker (requirement A)
+const REH_START = "2026-08-17", REH_END = "2026-11-21";
+
 let DATA = null, refreshTimer = null, submitting = false, mode = "form";
+let conflictDates = []; // ISO date strings the auditioner has flagged as conflicts
 
 function esc(t){ return String(t==null?"":t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function fmtDay(local){ const [d]=local.split("T"); const dt=new Date(d+"T00:00:00");
@@ -227,8 +285,55 @@ function renderForm(){
           </select></label>
         <label class="field" id="militaryDetailWrap" hidden><span class="lab">If yes, please explain</span>
           <textarea name="military_detail" id="military_detail" maxlength="800" placeholder="Branch, years of service, role, relevant experience…"></textarea></label>
-        <label class="field"><span class="lab">Anything we should know? <span style="color:var(--ink-soft);font-weight:400">(optional)</span></span>
-          <textarea name="notes" maxlength="800" placeholder="Conflicts, experience, questions…"></textarea></label>
+
+        <div class="section-label">Your experience</div>
+        <label class="field"><span class="lab">Are you willing to be in the ensemble? <span class="req">*</span></span>
+          <select name="ensemble" id="ensemble" required>
+            <option value="" disabled selected>Select one…</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select></label>
+        <label class="field"><span class="lab">Previous stage experience <span class="optional">(optional)</span></span>
+          <textarea name="stage_experience" maxlength="1200" placeholder="Shows, roles, companies — a quick rundown is fine."></textarea></label>
+        <label class="field"><span class="lab">Previous theatre training / school <span class="optional">(optional)</span></span>
+          <textarea name="training" maxlength="800" placeholder="Classes, workshops, degrees, coaches…"></textarea></label>
+
+        <div class="section-label">Rehearsal availability <span class="req">*</span></div>
+        <div class="section-hint">Rehearsals are tentatively weeknight evenings <b>6:30–9:00 PM</b> — either Mon–Thu or Tue–Fri (subject to change). Tell us any conflicts between <b>Aug 17</b> and <b>Nov 21, 2026</b>.</div>
+        <label class="check full nonebox"><input type="checkbox" id="noConflicts"> <span>I have <b>no known conflicts</b> in this window</span></label>
+        <div class="subfields" id="conflictFields">
+          <span class="lab" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Standing weeknight conflicts (a night you can never rehearse)</span>
+          <div class="days" id="weekdays">
+            ${WEEKDAYS.map(d=>`<label class="day" data-day="${esc(d)}"><input type="checkbox" name="wk" value="${esc(d)}">${esc(d.slice(0,3))}</label>`).join("")}
+          </div>
+          <span class="lab" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Specific dates you can't make it</span>
+          <div class="dateadd">
+            <input type="date" id="confDate" min="${REH_START}" max="${REH_END}" value="${REH_START}">
+            <button type="button" class="btn btn-ghost" id="addDate">Add date</button>
+          </div>
+          <div class="chips" id="dateChips"></div>
+          <label class="field" style="margin-top:6px"><span class="lab">Anything else about your availability?</span>
+            <textarea name="conflict_notes" maxlength="800" placeholder="Vacations, date ranges, work schedule, whether Mon–Thu or Tue–Fri is easier for you…"></textarea></label>
+        </div>
+
+        <div class="section-label">If you're not cast <span class="optional">(optional)</span></div>
+        <div class="section-hint">Would you help behind the scenes? Pick anything you'd enjoy — choose as many as you like.</div>
+        <div class="checkgrid" id="crew">
+          ${CREW.map((c,i)=>`<label class="check${i===0?" full":""}"><input type="checkbox" name="crew" value="${esc(c)}"> <span>${esc(c)}</span></label>`).join("")}
+        </div>
+
+        <div class="section-label">Emergency contact <span class="optional">(optional)</span></div>
+        <div class="two">
+          <label class="field"><span class="lab">Contact name</span>
+            <input name="emergency_name" maxlength="120" autocomplete="off"></label>
+          <label class="field"><span class="lab">Contact phone</span>
+            <input name="emergency_phone" type="tel" maxlength="40" inputmode="tel" autocomplete="off"></label>
+        </div>
+
+        <div class="section-label">Stay in touch</div>
+        <label class="check full" style="margin-bottom:16px"><input type="checkbox" id="mailing" name="mailing_list"> <span>Add me to the mailing list for news &amp; future auditions</span></label>
+        <label class="field"><span class="lab">Anything else we should know? <span class="optional">(optional)</span></span>
+          <textarea name="notes" maxlength="800" placeholder="Questions, notes for the casting team…"></textarea></label>
         <button class="btn btn-primary" type="submit" id="submit" ${open?"":"disabled"}>${open?"Confirm my audition":"All times are booked"}</button>
       </form>
     </div>`;
@@ -240,21 +345,83 @@ function renderForm(){
     wrap.hidden = !show;
     if(!show) $("#military_detail").value = "";
   });
+  wireAvailability();
+}
+
+// ── Rehearsal-availability controls (requirement A) ──────────────────────────
+function wireAvailability(){
+  conflictDates = [];
+  renderChips();
+  // weekday toggle chips
+  $("#weekdays").querySelectorAll(".day").forEach(lbl=>{
+    const cb = lbl.querySelector("input");
+    cb.addEventListener("change", ()=>{ lbl.classList.toggle("on", cb.checked); if(cb.checked) clearNone(); });
+  });
+  // add a specific conflict date
+  const add = ()=>{
+    const v = $("#confDate").value;
+    if(!v) return;
+    if(v < REH_START || v > REH_END){ flash("Pick a date between Aug 17 and Nov 21, 2026."); return; }
+    if(!conflictDates.includes(v)){ conflictDates.push(v); conflictDates.sort(); renderChips(); clearNone(); }
+  };
+  $("#addDate").addEventListener("click", add);
+  $("#confDate").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); } });
+  // "no conflicts" clears & dims everything else
+  const none = $("#noConflicts");
+  none.addEventListener("change", ()=>{
+    const fields = $("#conflictFields");
+    fields.classList.toggle("dim", none.checked);
+    if(none.checked){
+      conflictDates = []; renderChips();
+      $("#weekdays").querySelectorAll("input").forEach(cb=>{ cb.checked=false; cb.closest(".day").classList.remove("on"); });
+      const cn = $("[name='conflict_notes']"); if(cn) cn.value="";
+    }
+  });
+}
+function clearNone(){ const n=$("#noConflicts"); if(n && n.checked){ n.checked=false; $("#conflictFields").classList.remove("dim"); } }
+function renderChips(){
+  const box = $("#dateChips"); if(!box) return;
+  box.innerHTML = conflictDates.map(d=>{
+    const dt = new Date(d+"T00:00:00");
+    const lbl = dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+    return `<span class="chip">${esc(lbl)}<button type="button" data-d="${esc(d)}" aria-label="Remove">×</button></span>`;
+  }).join("");
+  box.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+    conflictDates = conflictDates.filter(x=>x!==b.dataset.d); renderChips();
+  }));
+}
+function flash(text){
+  const msg = $("#formmsg"); if(!msg) return;
+  msg.innerHTML = `<div class="msg warn">${esc(text)}</div>`;
+  msg.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 
 async function submit(e){
   e.preventDefault();
   if(submitting) return;
   const fd = new FormData(e.target);
+  const noConf = !!($("#noConflicts") && $("#noConflicts").checked);
+  const weekdays = Array.from(document.querySelectorAll("input[name='wk']:checked")).map(c=>c.value);
+  const crew = Array.from(document.querySelectorAll("input[name='crew']:checked")).map(c=>c.value);
   const body = { slot_id:fd.get("slot_id")||"", name:(fd.get("name")||"").trim(), email:(fd.get("email")||"").trim(),
     phone:(fd.get("phone")||"").trim(), role:(fd.get("role")||"").trim(),
     military:(fd.get("military")||"").trim(), military_detail:(fd.get("military_detail")||"").trim(),
+    ensemble:(fd.get("ensemble")||"").trim(),
+    stage_experience:(fd.get("stage_experience")||"").trim(), training:(fd.get("training")||"").trim(),
+    conflict_none:noConf, conflict_weekdays:noConf?[]:weekdays, conflict_dates:noConf?[]:conflictDates.slice(),
+    conflict_notes:noConf?"":(fd.get("conflict_notes")||"").trim(),
+    crew_interests:crew,
+    emergency_name:(fd.get("emergency_name")||"").trim(), emergency_phone:(fd.get("emergency_phone")||"").trim(),
+    mailing_list: ($("#mailing") && $("#mailing").checked) ? "Yes" : "No",
     notes:(fd.get("notes")||"").trim() };
   const msg = $("#formmsg"); msg.innerHTML="";
   if(!body.slot_id){ msg.innerHTML=`<div class="msg err">Please choose an audition time.</div>`; return; }
   if(!body.name){ msg.innerHTML=`<div class="msg err">Please enter your name.</div>`; return; }
   if(!body.email && !body.phone){ msg.innerHTML=`<div class="msg err">Please add an email or phone number.</div>`; return; }
   if(!body.military){ msg.innerHTML=`<div class="msg err">Please answer the military experience question.</div>`; return; }
+  if(!body.ensemble){ msg.innerHTML=`<div class="msg err">Please tell us whether you're willing to be in the ensemble.</div>`; return; }
+  if(!noConf && !weekdays.length && !conflictDates.length && !body.conflict_notes){
+    msg.innerHTML=`<div class="msg err">Please list any rehearsal conflicts — or check "I have no known conflicts."</div>`; return; }
   submitting=true;
   const btn = $("#submit"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span>Confirming…`;
   try{

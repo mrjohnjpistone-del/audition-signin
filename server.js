@@ -53,7 +53,11 @@ function freshStore() {
     },
     // Tuesday, August 4, 2026 · 6:00–9:00 PM · 10-minute slots (18 total)
     slots: genSlots('2026-08-04', 18 * 60, 21 * 60, 10),
-    signups: [], // { id, slot_id, name, email, phone, role, notes, created_at }
+    // { id, slot_id, name, email, phone, role, military, military_detail, ensemble,
+    //   stage_experience, training, conflict_none, conflict_weekdays[], conflict_dates[],
+    //   conflict_notes, crew_interests[], emergency_name, emergency_phone, mailing_list,
+    //   notes, created_at }
+    signups: [],
   };
 }
 function load() {
@@ -172,6 +176,22 @@ const server = http.createServer(async (req, res) => {
             phone = s(b.phone, 40), role = s(b.role, 160), notes = s(b.notes, 800);
       let military = s(b.military, 10); military = military === 'Yes' ? 'Yes' : military === 'No' ? 'No' : '';
       const military_detail = military === 'Yes' ? s(b.military_detail, 800) : '';
+      // ── New audition-registration fields (A–G) ──────────────────────────────
+      let ensemble = s(b.ensemble, 10); ensemble = ensemble === 'Yes' ? 'Yes' : ensemble === 'No' ? 'No' : '';
+      const stage_experience = s(b.stage_experience, 1200);
+      const training = s(b.training, 800);
+      const emergency_name = s(b.emergency_name, 120);
+      const emergency_phone = s(b.emergency_phone, 40);
+      const mailing_list = s(b.mailing_list, 10) === 'Yes' ? 'Yes' : 'No';
+      const conflict_none = b.conflict_none === true || b.conflict_none === 'true';
+      const WEEKDAYS = /^(Monday|Tuesday|Wednesday|Thursday|Friday)$/;
+      const conflict_weekdays = Array.isArray(b.conflict_weekdays)
+        ? b.conflict_weekdays.map((x) => s(x, 12)).filter((x) => WEEKDAYS.test(x)).slice(0, 5) : [];
+      const conflict_dates = Array.isArray(b.conflict_dates)
+        ? [...new Set(b.conflict_dates.map((x) => s(x, 10)).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)))].sort().slice(0, 120) : [];
+      const conflict_notes = s(b.conflict_notes, 800);
+      const crew_interests = Array.isArray(b.crew_interests)
+        ? [...new Set(b.crew_interests.map((x) => s(x, 60)).filter(Boolean))].slice(0, 30) : [];
       if (!name) return sendJson(res, 400, { error: 'Please enter your name.' });
       if (!email && !phone) return sendJson(res, 400, { error: 'Please add an email or phone so staff can reach you.' });
       if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return sendJson(res, 400, { error: 'That email address looks off — please check it.' });
@@ -182,7 +202,10 @@ const server = http.createServer(async (req, res) => {
       if (isTaken(slot_id)) return sendJson(res, 409, { error: 'Sorry — someone just claimed that slot. Please pick another.' });
       store.signups.push({ id: uuid(), slot_id, name, email: email || null, phone: phone || null,
         role: role || null, military, military_detail: military_detail || null,
-        notes: notes || null, created_at: new Date().toISOString() });
+        ensemble: ensemble || null, stage_experience: stage_experience || null, training: training || null,
+        conflict_none: !!conflict_none, conflict_weekdays, conflict_dates, conflict_notes: conflict_notes || null,
+        crew_interests, emergency_name: emergency_name || null, emergency_phone: emergency_phone || null,
+        mailing_list, notes: notes || null, created_at: new Date().toISOString() });
       save();
       return sendJson(res, 200, { ok: true, slot_local: slot.slot_local, duration_min: slot.duration_min });
     }
@@ -198,7 +221,12 @@ const server = http.createServer(async (req, res) => {
           const g = store.signups.find((x) => x.slot_id === sl.id);
           return { id: sl.id, slot_local: sl.slot_local, duration_min: sl.duration_min,
             signup: g ? { id: g.id, name: g.name, email: g.email, phone: g.phone, role: g.role,
-              military: g.military || null, military_detail: g.military_detail || null, notes: g.notes, created_at: g.created_at } : null };
+              military: g.military || null, military_detail: g.military_detail || null,
+              ensemble: g.ensemble || null, stage_experience: g.stage_experience || null, training: g.training || null,
+              conflict_none: !!g.conflict_none, conflict_weekdays: g.conflict_weekdays || [], conflict_dates: g.conflict_dates || [],
+              conflict_notes: g.conflict_notes || null, crew_interests: g.crew_interests || [],
+              emergency_name: g.emergency_name || null, emergency_phone: g.emergency_phone || null,
+              mailing_list: g.mailing_list || null, notes: g.notes, created_at: g.created_at } : null };
         });
         const e = store.settings;
         return sendJson(res, 200, {
