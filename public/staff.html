@@ -107,8 +107,28 @@
   .ci .tag{font-size:11px; font-weight:600; background:var(--panel-2); border:1px solid var(--line); border-radius:16px; padding:2px 9px}
   .ci .conflict{color:var(--err)} .ci .clear{color:var(--booked)}
   .ci .ci-mail{display:inline-block; margin-top:2px; font-size:11px; font-weight:700; color:var(--booked); background:var(--booked-bg); border-radius:16px; padding:2px 9px}
-  .ci .ci-del{position:absolute; top:12px; right:12px}
+  .ci .ci-actions{flex:0 0 auto; display:flex; gap:6px}
   .ci .ci-notes{font-size:13px; color:var(--ink-soft); font-style:italic; margin-top:10px}
+  .dayhdr .btn.small{margin-left:auto}
+  /* modal edit sections + controls */
+  .editsec{font-family:var(--serif); font-weight:700; font-size:15px; color:var(--gold-ink);
+    margin:18px 0 10px; padding-top:14px; border-top:1px solid var(--line)}
+  .editsec:first-of-type{border-top:none; padding-top:0; margin-top:2px}
+  .modal .days{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:0 0 14px}
+  .modal .day{cursor:pointer; text-align:center; font-size:12px; font-weight:600; padding:9px 3px; border-radius:9px;
+    border:1.5px solid var(--line); background:var(--panel-2); color:var(--ink-soft); user-select:none}
+  .modal .day.on{background:var(--wine); color:#fff; border-color:transparent}
+  @media (prefers-color-scheme:dark){ .modal .day.on{color:#1a1410} }
+  :root[data-theme="dark"] .modal .day.on{color:#1a1410}
+  .modal .checkgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
+  @media (max-width:480px){ .modal .checkgrid{grid-template-columns:1fr} }
+  .modal .check{display:flex; align-items:center; gap:9px; cursor:pointer; padding:9px 11px; border-radius:9px;
+    border:1.5px solid var(--line); background:var(--panel-2); font-size:13px; user-select:none}
+  .modal .check:has(input:checked){border-color:var(--gold); background:color-mix(in srgb,var(--gold) 12%,var(--panel-2))}
+  .modal .check input{width:17px; height:17px; flex:0 0 auto; accent-color:var(--wine); -webkit-appearance:auto; appearance:auto; margin:0}
+  .modal .check.full{grid-column:1/-1}
+  .modal .cbline{display:flex; align-items:center; gap:9px; cursor:pointer; font-size:14px; margin-bottom:14px}
+  .modal .cbline input{width:18px; height:18px; flex:0 0 auto; accent-color:var(--wine); -webkit-appearance:auto; appearance:auto; margin:0}
   /* gate */
   .gate{max-width:400px; margin:8vh auto 0}
   .gate h1{text-align:center; margin-bottom:6px}
@@ -143,6 +163,22 @@ const root = $("#root");
 const KEYNAME = "audition_staff_key";
 let KEY = localStorage.getItem(KEYNAME) || (new URLSearchParams(location.search).get("key")||"");
 let STATE = null, timer = null;
+
+// These mirror the /signin form (public/signin.html) so the staff editor offers
+// the same choices. Keep them in sync if the sign-in options ever change.
+const ROLES = [
+  "Lt. j.g. Daniel Kaffee","Lt. Cdr. JoAnne Galloway","Lt. Sam Weinberg","Lance Cpl. Harold Dawson",
+  "Pfc. Louden Downey","Col. Nathan Jessep","Lt. Jonathan Kendrick","Capt. Matthew Markinson",
+  "Lt. Jack Ross","Capt. Isaac Whitaker","Capt. Julius Alexander Randolph (Judge)","Cdr. Walter Stone",
+  "Cpl. Jeffrey Howard","Pfc. William Santiago","Ensemble — M.P. / Sailor / Marine","Open to any role",
+];
+const CREW = [
+  "Wherever I'm needed","Set construction","Set painting / scenic art","Stage crew / running crew",
+  "Props","Lighting","Sound","Costumes / wardrobe","Hair & makeup","Usher / front of house",
+  "Box office / tickets","Concessions","Publicity / social media","Photography / videography",
+  "Stage management","Program / graphic design",
+];
+const WEEKDAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
 
 function esc(t){ return String(t==null?"":t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function fmtDay(local){ const [d]=local.split("T"); const dt=new Date(d+"T00:00:00");
@@ -219,7 +255,7 @@ function renderRoster(){
     body = `<div class="card">`;
     for(const k of days){
       const bcount = byDay[k].filter(s=>s.signup).length;
-      body += `<div class="daygroup"><div class="dayhdr">${esc(fmtDay(k+"T00:00"))} <span class="count">${bcount}/${byDay[k].length} booked</span></div>`;
+      body += `<div class="daygroup"><div class="dayhdr">${esc(fmtDay(k+"T00:00"))} <span class="count">${bcount}/${byDay[k].length} booked</span><button class="btn small" data-editday="${esc(k)}">✎ Change date</button></div>`;
       for(const s of byDay[k]){
         const g = s.signup;
         if(g){
@@ -236,14 +272,14 @@ function renderRoster(){
               ${g.notes?`<div class="rnotes">“${esc(g.notes)}”</div>`:""}
             </div>
             <span class="pill b">Booked</span>
-            <div class="actions"><button class="btn small danger" data-cancel="${esc(g.id)}">Cancel</button></div>
+            <div class="actions"><button class="btn small" data-editrow="${esc(s.id)}">Edit</button><button class="btn small danger" data-cancel="${esc(g.id)}">Cancel</button></div>
           </div>`;
         } else {
           body += `<div class="row free">
             <div class="time"><div class="t">${esc(fmtTime(s.slot_local))}</div><div class="d">${s.duration_min} min</div></div>
             <div class="who"><div class="name">Open</div></div>
             <span class="pill o">Open</span>
-            <div class="actions"><button class="btn small danger" data-slot="${esc(s.id)}">Remove</button></div>
+            <div class="actions"><button class="btn small" data-editrow="${esc(s.id)}">Edit</button><button class="btn small danger" data-slot="${esc(s.id)}">Remove</button></div>
           </div>`;
         }
       }
@@ -283,12 +319,14 @@ function renderRoster(){
         rows.push([`Emergency`, em]);
       }
       return `<div class="ci">
-        <button class="btn small danger ci-del" data-ci="${esc(g.id)}">Remove</button>
-        <div class="ci-top"><div>
-          <div class="ci-name">${esc(g.name)}</div>
-          ${contacts.length?`<div class="ci-contact">${contacts.join(" · ")}</div>`:`<div class="ci-contact" style="color:var(--err)">no contact info</div>`}
-          ${g.mailing_list?`<span class="ci-mail">✉ Mailing list</span>`:""}
-        </div></div>
+        <div class="ci-top">
+          <div>
+            <div class="ci-name">${esc(g.name)}</div>
+            ${contacts.length?`<div class="ci-contact">${contacts.join(" · ")}</div>`:`<div class="ci-contact" style="color:var(--err)">no contact info</div>`}
+            ${g.mailing_list?`<span class="ci-mail">✉ Mailing list</span>`:""}
+          </div>
+          <div class="ci-actions"><button class="btn small" data-editci="${esc(g.id)}">Edit</button><button class="btn small danger" data-ci="${esc(g.id)}">Remove</button></div>
+        </div>
         <dl>${rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join("")}</dl>
         ${g.notes?`<div class="ci-notes">“${esc(g.notes)}”</div>`:""}
         <div class="ci-when">Signed in ${esc(fmtStamp(g.created_at))}</div>
@@ -330,6 +368,9 @@ function renderRoster(){
   root.querySelectorAll("[data-cancel]").forEach(b=>b.addEventListener("click",()=>cancelSignup(b.dataset.cancel)));
   root.querySelectorAll("[data-slot]").forEach(b=>b.addEventListener("click",()=>removeSlot(b.dataset.slot)));
   root.querySelectorAll("[data-ci]").forEach(b=>b.addEventListener("click",()=>removeCheckin(b.dataset.ci)));
+  root.querySelectorAll("[data-editrow]").forEach(b=>b.addEventListener("click",()=>modalEditRow(b.dataset.editrow)));
+  root.querySelectorAll("[data-editday]").forEach(b=>b.addEventListener("click",()=>modalMoveDay(b.dataset.editday)));
+  root.querySelectorAll("[data-editci]").forEach(b=>b.addEventListener("click",()=>modalEditCheckin(b.dataset.editci)));
   const ciBtn = $("#cicsv"); if(ciBtn) ciBtn.addEventListener("click", exportCheckinsCsv);
 }
 
@@ -431,11 +472,179 @@ function modalAdd(){
     }catch(e){ $("#amsg").innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
   });
 }
+// Edit one row: the timeslot (date/time/length) plus, if booked, the person's details.
+function modalEditRow(slotId){
+  const s = (STATE.slots||[]).find(x=>x.id===slotId); if(!s) return;
+  const g = s.signup;
+  const [date, time] = s.slot_local.split("T");
+  const roleOpts = ROLES.map(r=>`<option value="${esc(r)}"${g&&g.role===r?" selected":""}>${esc(r)}</option>`).join("");
+  const roleCustom = g && g.role && !ROLES.includes(g.role) ? `<option value="${esc(g.role)}" selected>${esc(g.role)}</option>` : "";
+  const person = g ? `
+    <div class="editsec">Person in this slot</div>
+    <label class="field"><span class="lab">Name</span><input id="p_name" maxlength="120" value="${esc(g.name||"")}"></label>
+    <div class="grid2">
+      <label class="field"><span class="lab">Email</span><input id="p_email" maxlength="160" value="${esc(g.email||"")}"></label>
+      <label class="field"><span class="lab">Phone</span><input id="p_phone" maxlength="40" value="${esc(g.phone||"")}"></label>
+    </div>
+    <label class="field"><span class="lab">Reading for (role)</span>
+      <select id="p_role">${roleCustom}${roleOpts}${g.role?"":`<option value="" selected>—</option>`}</select></label>
+    <div class="grid2">
+      <label class="field"><span class="lab">Military experience</span>
+        <select id="p_mil"><option value="No"${g.military==="No"?" selected":""}>No</option><option value="Yes"${g.military==="Yes"?" selected":""}>Yes</option></select></label>
+      <label class="field"><span class="lab">Military details</span><input id="p_mild" maxlength="800" value="${esc(g.military_detail||"")}"></label>
+    </div>
+    <label class="field"><span class="lab">Notes</span><textarea id="p_notes" maxlength="800">${esc(g.notes||"")}</textarea></label>` : "";
+  const m = openModal(`
+    <h3>${g?"Edit sign-up":"Edit timeslot"}</h3>
+    <p class="mhint">Change the date, time, length${g?", or this person's details":""}. Saved live for everyone.</p>
+    <div id="rmsg"></div>
+    <div class="editsec">Timeslot</div>
+    <label class="field"><span class="lab">Date</span><input id="r_date" type="date" value="${esc(date)}"></label>
+    <div class="grid2">
+      <label class="field"><span class="lab">Time</span><input id="r_time" type="time" value="${esc(time)}"></label>
+      <label class="field"><span class="lab">Minutes per slot</span><input id="r_dur" type="number" min="1" max="240" value="${s.duration_min}"></label>
+    </div>
+    ${person}
+    <div class="modal-actions">
+      <button class="btn" id="r_cancel">Cancel</button>
+      <button class="btn primary" id="r_go">Save changes</button>
+    </div>`);
+  $("#r_cancel").addEventListener("click", m.close);
+  $("#r_go").addEventListener("click", async ()=>{
+    const date=$("#r_date").value, time=$("#r_time").value, dur=parseInt($("#r_dur").value,10);
+    if(!date||!time){ $("#rmsg").innerHTML=`<div class="msg err">Date and time are both required.</div>`; return; }
+    try{
+      await api("/api/staff/slots/"+encodeURIComponent(slotId),{method:"PATCH",body:{slot_local:date+"T"+time, duration_min:dur}});
+      if(g){
+        await api("/api/staff/signups/"+encodeURIComponent(g.id),{method:"PATCH",body:{
+          name:$("#p_name").value, email:$("#p_email").value, phone:$("#p_phone").value,
+          role:$("#p_role").value, military:$("#p_mil").value, military_detail:$("#p_mild").value, notes:$("#p_notes").value }});
+      }
+      m.close(); toast("Saved"); refresh();
+    }catch(e){ $("#rmsg").innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+  });
+}
+
+// Move every slot on one day to a new date (keeps times, lengths, and bookings).
+function modalMoveDay(fromKey){
+  const m = openModal(`
+    <h3>Change this day's date</h3>
+    <p class="mhint">Moves every slot on <b>${esc(fmtDay(fromKey+"T00:00"))}</b> to a new date, keeping the same times and everyone already booked. Pick a date that has no slots yet.</p>
+    <div id="dmsg"></div>
+    <label class="field"><span class="lab">New date</span><input id="d_to" type="date" value="${esc(fromKey)}"></label>
+    <div class="modal-actions">
+      <button class="btn" id="d_cancel">Cancel</button>
+      <button class="btn primary" id="d_go">Move day</button>
+    </div>`);
+  $("#d_cancel").addEventListener("click", m.close);
+  $("#d_go").addEventListener("click", async ()=>{
+    const to=$("#d_to").value;
+    if(!to){ $("#dmsg").innerHTML=`<div class="msg err">Pick a date.</div>`; return; }
+    try{
+      const j=await api("/api/staff/day/move",{method:"POST",body:{from:fromKey,to}});
+      m.close(); toast(`Moved ${j.moved} slot${j.moved!==1?"s":""} to the new date`); refresh();
+    }catch(e){ $("#dmsg").innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+  });
+}
+
+// Edit a walk-in sign-in — every field on the card.
+function modalEditCheckin(id){
+  const c = (STATE.checkins||[]).find(x=>x.id===id); if(!c) return;
+  const roleOpts = ROLES.map(r=>`<option value="${esc(r)}"${c.role===r?" selected":""}>${esc(r)}</option>`).join("");
+  const roleCustom = c.role && !ROLES.includes(c.role) ? `<option value="${esc(c.role)}" selected>${esc(c.role)}</option>` : "";
+  const days = WEEKDAYS.map(d=>{
+    const on = (c.conflict_weekdays||[]).includes(d);
+    return `<label class="day${on?" on":""}" data-day="${esc(d)}"><input type="checkbox" ${on?"checked":""} style="display:none">${esc(d.slice(0,3))}</label>`;
+  }).join("");
+  const crew = CREW.slice();
+  (c.crew_interests||[]).forEach(x=>{ if(!crew.includes(x)) crew.push(x); });
+  const crewBoxes = crew.map((x,i)=>{
+    const on = (c.crew_interests||[]).includes(x);
+    return `<label class="check${i===0?" full":""}"><input type="checkbox" value="${esc(x)}" ${on?"checked":""}> <span>${esc(x)}</span></label>`;
+  }).join("");
+  const m = openModal(`
+    <h3>Edit sign-in</h3>
+    <p class="mhint">Fix or update anything this person submitted. Saved live.</p>
+    <div id="cmsg"></div>
+    <div class="editsec">Basics</div>
+    <label class="field"><span class="lab">Name</span><input id="c_name" maxlength="120" value="${esc(c.name||"")}"></label>
+    <div class="grid2">
+      <label class="field"><span class="lab">Email</span><input id="c_email" maxlength="160" value="${esc(c.email||"")}"></label>
+      <label class="field"><span class="lab">Phone</span><input id="c_phone" maxlength="40" value="${esc(c.phone||"")}"></label>
+    </div>
+    <label class="field"><span class="lab">Preferred role</span>
+      <select id="c_role"><option value="">—</option>${roleCustom}${roleOpts}</select></label>
+    <div class="grid2">
+      <label class="field"><span class="lab">Willing to be in ensemble?</span>
+        <select id="c_ens">
+          <option value=""${!c.ensemble?" selected":""}>—</option>
+          <option value="Yes"${c.ensemble==="Yes"?" selected":""}>Yes</option>
+          <option value="No"${c.ensemble==="No"?" selected":""}>No</option>
+          <option value="Only role"${c.ensemble==="Only role"?" selected":""}>Only a named role</option>
+        </select></label>
+      <label class="field"><span class="lab">Military experience</span>
+        <select id="c_mil"><option value="No"${c.military==="No"?" selected":""}>No</option><option value="Yes"${c.military==="Yes"?" selected":""}>Yes</option></select></label>
+    </div>
+    <label class="field"><span class="lab">Military details</span><input id="c_mild" maxlength="800" value="${esc(c.military_detail||"")}"></label>
+
+    <div class="editsec">Experience</div>
+    <label class="field"><span class="lab">Previous stage experience</span><textarea id="c_stage" maxlength="1500">${esc(c.stage_experience||"")}</textarea></label>
+    <label class="field"><span class="lab">Previous training / school</span><textarea id="c_train" maxlength="1500">${esc(c.training||"")}</textarea></label>
+
+    <div class="editsec">Rehearsal availability</div>
+    <label class="cbline"><input type="checkbox" id="c_none" ${c.conflict_none?"checked":""}> <span>No known conflicts</span></label>
+    <span class="lab" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Standing weeknight conflicts</span>
+    <div class="days" id="c_days">${days}</div>
+    <label class="field"><span class="lab">Specific dates unavailable <span style="color:var(--ink-soft);font-weight:400">(comma-separated, YYYY-MM-DD)</span></span>
+      <input id="c_dates" value="${esc((c.conflict_dates||[]).join(", "))}"></label>
+    <label class="field"><span class="lab">Availability notes</span><textarea id="c_cnotes" maxlength="800">${esc(c.conflict_notes||"")}</textarea></label>
+
+    <div class="editsec">Crew / behind the scenes</div>
+    <div class="checkgrid" id="c_crew">${crewBoxes}</div>
+
+    <div class="editsec">Emergency contact</div>
+    <div class="grid2">
+      <label class="field"><span class="lab">Contact name</span><input id="c_ename" maxlength="120" value="${esc(c.emergency_name||"")}"></label>
+      <label class="field"><span class="lab">Contact phone</span><input id="c_ephone" maxlength="40" value="${esc(c.emergency_phone||"")}"></label>
+    </div>
+
+    <div class="editsec">Other</div>
+    <label class="cbline"><input type="checkbox" id="c_mail" ${c.mailing_list?"checked":""}> <span>On the mailing list</span></label>
+    <label class="field"><span class="lab">Notes</span><textarea id="c_notes" maxlength="800">${esc(c.notes||"")}</textarea></label>
+    <div class="modal-actions">
+      <button class="btn" id="c_cancel">Cancel</button>
+      <button class="btn primary" id="c_go">Save changes</button>
+    </div>`);
+  // weekday chips toggle their hidden checkbox
+  m.scrim.querySelectorAll("#c_days .day").forEach(lbl=>{
+    lbl.addEventListener("click", ()=>{
+      const cb = lbl.querySelector("input"); cb.checked = !cb.checked; lbl.classList.toggle("on", cb.checked);
+    });
+  });
+  $("#c_cancel").addEventListener("click", m.close);
+  $("#c_go").addEventListener("click", async ()=>{
+    const none = $("#c_none").checked;
+    const weekdays = Array.from(m.scrim.querySelectorAll("#c_days .day input")).filter(cb=>cb.checked).map(cb=>cb.closest(".day").dataset.day);
+    const dates = $("#c_dates").value.split(",").map(x=>x.trim()).filter(Boolean);
+    const crewSel = Array.from(m.scrim.querySelectorAll("#c_crew input")).filter(cb=>cb.checked).map(cb=>cb.value);
+    try{
+      await api("/api/staff/checkins/"+encodeURIComponent(id),{method:"PATCH",body:{
+        name:$("#c_name").value, email:$("#c_email").value, phone:$("#c_phone").value,
+        role:$("#c_role").value, ensemble:$("#c_ens").value, military:$("#c_mil").value, military_detail:$("#c_mild").value,
+        stage_experience:$("#c_stage").value, training:$("#c_train").value,
+        conflict_none:none, conflict_weekdays:weekdays, conflict_dates:dates, conflict_notes:$("#c_cnotes").value,
+        crew_interests:crewSel, emergency_name:$("#c_ename").value, emergency_phone:$("#c_ephone").value,
+        mailing_list:$("#c_mail").checked, notes:$("#c_notes").value }});
+      m.close(); toast("Sign-in updated"); refresh();
+    }catch(e){ $("#cmsg").innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+  });
+}
+
 function modalEdit(){
   const e = STATE.event||{};
   const m = openModal(`
     <h3>Edit event</h3>
-    <p class="mhint">This is what people see on the public sign-up page.</p>
+    <p class="mhint">This is the show info people see on the public sign-up page. To add or change audition <b>dates</b>, use <b>＋ Add slots</b> (new day) or <b>✎ Change date</b> on a day heading.</p>
     <div id="emsg"></div>
     <label class="field"><span class="lab">Title</span><input id="e_title" maxlength="160" value="${esc(e.title||"")}"></label>
     <label class="field"><span class="lab">Subtitle / show</span><input id="e_sub" maxlength="200" value="${esc(e.subtitle||"")}"></label>

@@ -14,8 +14,13 @@
 //                 POST /api/checkin          walk-in audition sign-in (no slot)
 //   STAFF API     GET    /api/staff/roster        full roster w/ names + contacts + sign-ins
 //                 POST   /api/staff/slots         add slots (range-generate or list)
+//                 PATCH  /api/staff/slots/:id     edit a slot's date/time/duration
 //                 DELETE /api/staff/slots/:id     remove a slot
+//                 POST   /api/staff/day/move      move a whole day to a new date
+//                 PATCH  /api/staff/signups/:id   edit a booked person's details
 //                 DELETE /api/staff/signups/:id   cancel a signup (reopens the slot)
+//                 PATCH  /api/staff/checkins/:id  edit a walk-in sign-in (any field)
+//                 DELETE /api/staff/checkins/:id  remove a walk-in sign-in
 //                 POST   /api/staff/settings      edit event title/location/notes
 //                 POST   /api/staff/key           rotate the staff access key
 
@@ -341,6 +346,44 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true, deleted: before - store.slots.length });
       }
 
+      // Edit one slot's date/time and/or duration. Keeps any booking attached.
+      if (method === 'PATCH' && p.startsWith('/api/staff/slots/')) {
+        const id = decodeURIComponent(p.slice('/api/staff/slots/'.length));
+        const slot = store.slots.find((x) => x.id === id);
+        if (!slot) return sendJson(res, 404, { error: 'That timeslot no longer exists.' });
+        const b = await readBody(req);
+        if (b.slot_local !== undefined) {
+          const loc = s(b.slot_local, 16);
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(loc)) return sendJson(res, 400, { error: 'Bad date/time format.' });
+          if (store.slots.some((x) => x.id !== id && x.slot_local === loc))
+            return sendJson(res, 409, { error: 'Another slot is already at that exact date and time.' });
+          slot.slot_local = loc;
+        }
+        if (b.duration_min !== undefined)
+          slot.duration_min = Math.min(240, Math.max(1, parseInt(b.duration_min, 10) || slot.duration_min));
+        save();
+        return sendJson(res, 200, { ok: true, slot: { id: slot.id, slot_local: slot.slot_local, duration_min: slot.duration_min } });
+      }
+
+      // Move a whole day: shift every slot on `from` to `to`, keeping times, durations, and bookings.
+      if (method === 'POST' && p === '/api/staff/day/move') {
+        const b = await readBody(req);
+        const from = s(b.from, 10), to = s(b.to, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
+          return sendJson(res, 400, { error: 'Bad date format.' });
+        if (from === to) return sendJson(res, 400, { error: 'Pick a different date to move the day to.' });
+        const moving = store.slots.filter((x) => x.slot_local.slice(0, 10) === from);
+        if (!moving.length) return sendJson(res, 404, { error: 'There are no slots on that day.' });
+        const otherTimes = new Set(store.slots.filter((x) => x.slot_local.slice(0, 10) !== from).map((x) => x.slot_local));
+        for (const sl of moving) {
+          if (otherTimes.has(to + sl.slot_local.slice(10)))
+            return sendJson(res, 409, { error: `The target date already has a slot at ${sl.slot_local.slice(11)}. Pick a date with no slots yet, or move that slot first.` });
+        }
+        for (const sl of moving) sl.slot_local = to + sl.slot_local.slice(10);
+        save();
+        return sendJson(res, 200, { ok: true, moved: moving.length });
+      }
+
       if (method === 'DELETE' && p.startsWith('/api/staff/signups/')) {
         const id = decodeURIComponent(p.slice('/api/staff/signups/'.length));
         const before = store.signups.length;
@@ -349,12 +392,83 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true, deleted: before - store.signups.length });
       }
 
+      // Edit a booked person's details (name/contact/role/military/notes).
+      if (method === 'PATCH' && p.startsWith('/api/staff/signups/')) {
+        const id = decodeURIComponent(p.slice('/api/staff/signups/'.length));
+        const g = store.signups.find((x) => x.id === id);
+        if (!g) return sendJson(res, 404, { error: 'That sign-up no longer exists.' });
+        const b = await readBody(req);
+        const pick = (k, max, cur) => (b[k] !== undefined ? s(b[k], max) : (cur || ''));
+        const name = pick('name', 120, g.name);
+        const email = pick('email', 160, g.email);
+        const phone = pick('phone', 40, g.phone);
+        const role = pick('role', 160, g.role);
+        const notes = pick('notes', 800, g.notes);
+        let military = b.military !== undefined ? s(b.military, 10) : g.military;
+        military = military === 'Yes' ? 'Yes' : military === 'No' ? 'No' : '';
+        const military_detail = military === 'Yes' ? pick('military_detail', 800, g.military_detail) : '';
+        if (!name) return sendJson(res, 400, { error: 'Please enter a name.' });
+        if (!email && !phone) return sendJson(res, 400, { error: 'Please add an email or phone.' });
+        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return sendJson(res, 400, { error: 'That email address looks off — please check it.' });
+        if (!military) return sendJson(res, 400, { error: 'Please answer the military experience question.' });
+        Object.assign(g, { name, email: email || null, phone: phone || null, role: role || null,
+          military, military_detail: military_detail || null, notes: notes || null });
+        save();
+        return sendJson(res, 200, { ok: true });
+      }
+
       if (method === 'DELETE' && p.startsWith('/api/staff/checkins/')) {
         const id = decodeURIComponent(p.slice('/api/staff/checkins/'.length));
         const before = store.checkins.length;
         store.checkins = store.checkins.filter((c) => c.id !== id);
         save();
         return sendJson(res, 200, { ok: true, deleted: before - store.checkins.length });
+      }
+
+      // Edit a walk-in sign-in — any field on the card. Only fields present in the
+      // body are changed; the rest keep their current value.
+      if (method === 'PATCH' && p.startsWith('/api/staff/checkins/')) {
+        const id = decodeURIComponent(p.slice('/api/staff/checkins/'.length));
+        const c = store.checkins.find((x) => x.id === id);
+        if (!c) return sendJson(res, 404, { error: 'That sign-in no longer exists.' });
+        const b = await readBody(req);
+        const pick = (k, max, cur) => (b[k] !== undefined ? s(b[k], max) : (cur || ''));
+        const name = pick('name', 120, c.name);
+        const email = pick('email', 160, c.email);
+        const phone = pick('phone', 40, c.phone);
+        const role = pick('role', 160, c.role);
+        const notes = pick('notes', 800, c.notes);
+        let military = b.military !== undefined ? s(b.military, 10) : c.military;
+        military = military === 'Yes' ? 'Yes' : military === 'No' ? 'No' : '';
+        const military_detail = military === 'Yes' ? pick('military_detail', 800, c.military_detail) : '';
+        let ensemble = b.ensemble !== undefined ? s(b.ensemble, 20) : c.ensemble;
+        ensemble = ['Yes', 'No', 'Only role'].includes(ensemble) ? ensemble : '';
+        const stage_experience = pick('stage_experience', 1500, c.stage_experience);
+        const training = pick('training', 1500, c.training);
+        const conflict_none = b.conflict_none !== undefined ? (b.conflict_none === true || b.conflict_none === 'true') : !!c.conflict_none;
+        const conflict_weekdays = conflict_none ? []
+          : (b.conflict_weekdays !== undefined ? pickList(b.conflict_weekdays, WEEKDAYS, 12) : (c.conflict_weekdays || []));
+        const conflict_dates = conflict_none ? []
+          : (b.conflict_dates !== undefined ? pickList(b.conflict_dates, null, 10).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)) : (c.conflict_dates || []));
+        const conflict_notes = conflict_none ? '' : pick('conflict_notes', 800, c.conflict_notes);
+        const crew_interests = b.crew_interests !== undefined ? pickList(b.crew_interests, null, 60) : (c.crew_interests || []);
+        const emergency_name = pick('emergency_name', 120, c.emergency_name);
+        const emergency_phone = pick('emergency_phone', 40, c.emergency_phone);
+        const mailing_list = b.mailing_list !== undefined ? (b.mailing_list === true || b.mailing_list === 'true') : !!c.mailing_list;
+        if (!name) return sendJson(res, 400, { error: 'Please enter a name.' });
+        if (!email && !phone) return sendJson(res, 400, { error: 'Please add an email or phone.' });
+        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return sendJson(res, 400, { error: 'That email address looks off — please check it.' });
+        if (!military) return sendJson(res, 400, { error: 'Please answer the military experience question.' });
+        Object.assign(c, {
+          name, email: email || null, phone: phone || null, role: role || null,
+          military, military_detail: military_detail || null,
+          ensemble: ensemble || null, stage_experience: stage_experience || null, training: training || null,
+          conflict_none, conflict_weekdays, conflict_dates, conflict_notes: conflict_notes || null,
+          crew_interests, emergency_name: emergency_name || null, emergency_phone: emergency_phone || null,
+          mailing_list, notes: notes || null,
+        });
+        save();
+        return sendJson(res, 200, { ok: true });
       }
 
       if (method === 'POST' && p === '/api/staff/settings') {
