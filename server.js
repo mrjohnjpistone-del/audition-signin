@@ -34,6 +34,10 @@ const DATA_DIR    = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE   = path.join(DATA_DIR, 'auditions.json');
 const PUBLIC_DIR  = path.join(__dirname, 'public');
 const DEFAULT_KEY = process.env.STAFF_KEY || 'GRZonptDh8QY';
+// The venue's timezone (Morrilton, AR = US Central). Slot times are stored as the
+// venue's wall-clock; "today" must be computed in the venue's zone, not the server's
+// (Render runs in UTC — a naive new Date() would flip a day early each evening).
+const VENUE_TZ    = process.env.VENUE_TZ || 'America/Chicago';
 
 // ── Storage: one JSON file, atomic writes, serialized so writes never interleave ──
 // Build back-to-back slots for one day: local wall-clock 'YYYY-MM-DDTHH:MM' strings.
@@ -122,6 +126,12 @@ function readBody(req) {
   });
 }
 const isTaken = (slotId) => store.signups.some((g) => g.slot_id === slotId);
+// The current calendar date at the venue, as 'YYYY-MM-DD' (en-CA formats ISO-style).
+// A slot is "past" once its date is before this — so today's remaining times still show.
+function venueToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: VENUE_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+const isPastSlot = (slot_local) => slot_local.slice(0, 10) < venueToday();
 
 // ── Signup rate limit: 15 / hour / IP ────────────────────────────────────────
 const hits = new Map();
@@ -197,9 +207,13 @@ const server = http.createServer(async (req, res) => {
 
     // ── PUBLIC API ──────────────────────────────────────────────────────────
     if (method === 'GET' && p === '/api/public') {
-      const slots = store.slots.slice().sort(byLocal).map((sl) => ({
-        id: sl.id, slot_local: sl.slot_local, duration_min: sl.duration_min, taken: isTaken(sl.id),
-      }));
+      // Only upcoming times are offered publicly. Past audition dates are hidden so
+      // no one can book a date that has already happened. (Staff still see everything.)
+      const slots = store.slots.slice()
+        .filter((sl) => !isPastSlot(sl.slot_local))
+        .sort(byLocal).map((sl) => ({
+          id: sl.id, slot_local: sl.slot_local, duration_min: sl.duration_min, taken: isTaken(sl.id),
+        }));
       const e = store.settings;
       return sendJson(res, 200, {
         event: { title: e.title, subtitle: e.subtitle, location: e.location, notes: e.notes },
@@ -221,6 +235,8 @@ const server = http.createServer(async (req, res) => {
       if (!military) return sendJson(res, 400, { error: 'Please answer the military experience question.' });
       const slot = store.slots.find((x) => x.id === slot_id);
       if (!slot) return sendJson(res, 404, { error: 'That timeslot no longer exists.' });
+      if (isPastSlot(slot.slot_local))
+        return sendJson(res, 409, { error: 'That audition date has already passed. Please pick an upcoming time.' });
       // Single-threaded Node: this check-then-insert is atomic (no await between them).
       if (isTaken(slot_id)) return sendJson(res, 409, { error: 'Sorry — someone just claimed that slot. Please pick another.' });
       store.signups.push({ id: uuid(), slot_id, name, email: email || null, phone: phone || null,
