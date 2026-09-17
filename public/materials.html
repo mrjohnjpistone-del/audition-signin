@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Materials List — A Few Good Men</title>
+<style>
+  :root{
+    --bg:#f6efe4; --panel:#fffaf2; --panel-2:#f3e9d8; --ink:#241a12; --ink-soft:#6a5c4a;
+    --line:#e2d3ba; --gold:#b8862f; --gold-ink:#7a5410; --wine:#7a1f2b; --wine-ink:#5c1620;
+    --ok:#2f6b46; --ok-bg:#e4f0e6; --err:#9a2530; --err-bg:#f7e4e2;
+    --shadow:0 10px 40px rgba(50,30,10,.14); --radius:16px;
+    --serif:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#171310; --panel:#221b15; --panel-2:#2b221a; --ink:#f3e8d8; --ink-soft:#b7a58c;
+      --line:#3a2e22; --gold:#e0ad55; --gold-ink:#f0cd8b; --wine:#d98a94; --wine-ink:#eab6bc;
+      --ok:#8fd0a3; --ok-bg:#1d2a20; --err:#f0a7a1; --err-bg:#2c1a19;
+      --shadow:0 12px 44px rgba(0,0,0,.5);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:max(16px,env(safe-area-inset-top)) 16px calc(48px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:900px; margin:0 auto}
+  header.masthead{text-align:center; padding:20px 0 6px}
+  .eyebrow{text-transform:uppercase; letter-spacing:.28em; font-size:11px; color:var(--gold-ink); font-weight:700; margin-bottom:10px}
+  h1{font-family:var(--serif); font-weight:700; font-size:clamp(28px,6.4vw,42px); margin:0; line-height:1.08; text-wrap:balance}
+  .subtitle{color:var(--ink-soft); font-family:var(--serif); font-style:italic; font-size:clamp(15px,3.4vw,19px); margin-top:8px}
+  .rule{height:1px; background:linear-gradient(90deg,transparent,var(--line) 15%,var(--line) 85%,transparent); margin:18px 0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px}
+  .card + .card{margin-top:14px}
+
+  input,textarea,select{width:100%; font:inherit; color:inherit; background:var(--panel-2);
+    border:1.5px solid var(--line); border-radius:10px; padding:11px 12px; -webkit-appearance:none; appearance:none}
+  select{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237a5410' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat:no-repeat; background-position:right 12px center; padding-right:38px; cursor:pointer;
+  }
+  @media (prefers-color-scheme:dark){ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f0cd8b' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");} }
+  input:focus,textarea:focus,select:focus,button:focus-visible{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 22%,transparent)}
+  button:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+  textarea{min-height:64px; resize:vertical}
+  label .lab{display:block; font-size:12px; font-weight:700; margin-bottom:5px; color:var(--ink-soft)}
+  label .req{color:var(--wine)}
+
+  .btn{appearance:none; cursor:pointer; font:inherit; font-weight:700; border-radius:11px;
+    border:1px solid transparent; padding:11px 16px; transition:transform .06s ease, filter .15s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--wine); color:#fff}
+  @media (prefers-color-scheme:dark){ .btn-primary{color:#1a1410} }
+  .btn-primary:disabled{opacity:.55; cursor:not-allowed}
+  .btn-ghost{background:transparent; color:var(--ink); border-color:var(--line); font-weight:600}
+  .btn-ghost:hover{background:var(--panel-2)}
+  .btn-sm{padding:7px 11px; font-size:13px; border-radius:9px}
+  .btn-danger{background:transparent; color:var(--err); border-color:var(--line); font-weight:600}
+
+  .toolbar{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end}
+  .filters{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px}
+  @media (max-width:640px){
+    .toolbar{grid-template-columns:1fr}
+    .filters{grid-template-columns:1fr 1fr}
+  }
+  .summary{display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:14px;
+    padding-top:13px; border-top:1px dashed var(--line); font-size:14px; color:var(--ink-soft)}
+  .summary b{color:var(--ink)}
+
+  .group{margin-top:22px}
+  .group-head{display:flex; align-items:baseline; gap:10px; margin:0 2px 8px}
+  .group-head h2{font-family:var(--serif); font-size:21px; margin:0}
+  .group-head .count{font-size:13px; color:var(--ink-soft)}
+
+  .item{background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:13px 14px; margin-bottom:9px;
+    display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start; box-shadow:0 2px 10px rgba(50,30,10,.05)}
+  @media (prefers-color-scheme:dark){ .item{box-shadow:none} }
+  .item.done .name{text-decoration:line-through; opacity:.6}
+  .qty{font-family:var(--serif); font-size:20px; font-weight:700; color:var(--gold-ink); min-width:56px; text-align:center;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:6px 8px; line-height:1.15}
+  .qty small{display:block; font-family:var(--sans); font-size:10px; font-weight:700; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--ink-soft)}
+  .name{font-weight:700; margin:0 0 4px; overflow-wrap:anywhere}
+  .tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px}
+  .tag{font-size:11px; font-weight:700; letter-spacing:.03em; border-radius:20px; padding:3px 9px;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--ink-soft); white-space:nowrap}
+  .tag.area{color:var(--gold-ink)}
+  .tag.cost{color:var(--ink)}
+  .note{font-size:13px; color:var(--ink-soft); margin-top:5px; overflow-wrap:anywhere}
+  .note a{color:var(--wine-ink)}
+  @media (prefers-color-scheme:dark){ .note a{color:var(--wine)} }
+  .actions{display:flex; flex-direction:column; gap:6px; align-items:stretch; min-width:118px}
+  .actions select{padding:7px 28px 7px 10px; font-size:13px; font-weight:700; background-position:right 8px center}
+  .row-btns{display:flex; gap:6px}
+  .row-btns .btn{flex:1}
+  @media (max-width:560px){
+    .item{grid-template-columns:auto 1fr}
+    .actions{grid-column:1 / -1; flex-direction:row; align-items:center}
+    .actions select{flex:1}
+    .row-btns{flex:1}
+  }
+  .item[data-status="Needed"]{border-left:4px solid var(--wine)}
+  .item[data-status="Have it"]{border-left:4px solid var(--gold)}
+  .item[data-status="Purchased"]{border-left:4px solid var(--ok)}
+
+  .msg{border-radius:10px; padding:11px 13px; margin-bottom:12px; font-size:14px; font-weight:600}
+  .msg.err{background:var(--err-bg); color:var(--err)}
+  .msg.ok{background:var(--ok-bg); color:var(--ok); display:flex; justify-content:space-between; gap:12px; align-items:center}
+  .empty{text-align:center; color:var(--ink-soft); padding:26px 10px}
+  .foot{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:26px}
+  .foot-note{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:14px}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .form-grid .full{grid-column:1 / -1}
+  @media (max-width:560px){ .form-grid{grid-template-columns:1fr} }
+  .spin{display:inline-block; width:15px; height:15px; border:2px solid currentColor; border-right-color:transparent;
+    border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){ .spin{animation:none} .btn:active{transform:none} }
+  .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+  @media print{
+    body{background:#fff; color:#000; padding:0}
+    .card.toolbar-card,.actions,.foot,.foot-note,#formCard,#msg{display:none !important}
+    .item{break-inside:avoid; box-shadow:none; border-color:#bbb}
+    .masthead{padding-top:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow">Set Build</div>
+    <h1>Materials List</h1>
+    <div class="subtitle" id="showName">A Few Good Men</div>
+  </header>
+  <div class="rule"></div>
+
+  <div id="msg" hidden></div>
+
+  <div class="card toolbar-card">
+    <div class="toolbar">
+      <label>
+        <span class="lab">Search</span>
+        <input id="q" type="search" placeholder="Search items, notes, or what they're for…" autocomplete="off">
+      </label>
+      <button class="btn btn-primary" id="addBtn" type="button">+ Add item</button>
+    </div>
+    <div class="filters">
+      <label>
+        <span class="lab">Group by</span>
+        <select id="groupBy">
+          <option value="area">What it's for</option>
+          <option value="category">Type of material</option>
+          <option value="status">Status</option>
+          <option value="none">Nothing — one list</option>
+        </select>
+      </label>
+      <label>
+        <span class="lab">Show</span>
+        <select id="statusFilter">
+          <option value="">Everything</option>
+          <option value="Needed">Still needed</option>
+          <option value="Have it">Have it</option>
+          <option value="Purchased">Purchased</option>
+        </select>
+      </label>
+      <label>
+        <span class="lab">Sort</span>
+        <select id="sortBy">
+          <option value="name">Item name</option>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="qty">Quantity</option>
+          <option value="cost">Estimated cost</option>
+        </select>
+      </label>
+    </div>
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <div class="card" id="formCard" hidden>
+    <form id="itemForm" novalidate>
+      <h2 style="font-family:var(--serif); font-size:20px; margin:0 0 14px" id="formTitle">Add an item</h2>
+      <div class="form-grid">
+        <label class="full">
+          <span class="lab">Item <span class="req">*</span></span>
+          <input id="f_name" maxlength="160" placeholder="e.g. 2x4x12 lumber" required>
+        </label>
+        <label>
+          <span class="lab">How many</span>
+          <input id="f_qty" type="number" min="0.25" step="0.25" value="1" inputmode="decimal">
+        </label>
+        <label>
+          <span class="lab">Unit</span>
+          <input id="f_unit" maxlength="40" list="units" placeholder="each, sheets, gallons, box…">
+          <datalist id="units">
+            <option>each</option><option>sheets</option><option>gallons</option><option>quarts</option>
+            <option>box</option><option>rolls</option><option>feet</option><option>yards</option><option>set</option>
+          </datalist>
+        </label>
+        <label>
+          <span class="lab">What it's for</span>
+          <input id="f_area" maxlength="80" list="areas" placeholder="Jessup's desk, Judge's box, balcony…">
+          <datalist id="areas"></datalist>
+        </label>
+        <label>
+          <span class="lab">Type of material</span>
+          <select id="f_category"></select>
+        </label>
+        <label>
+          <span class="lab">Status</span>
+          <select id="f_status"></select>
+        </label>
+        <label>
+          <span class="lab">Estimated cost (total, optional)</span>
+          <input id="f_cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="$">
+        </label>
+        <label class="full">
+          <span class="lab">Link (optional)</span>
+          <input id="f_link" type="url" maxlength="500" inputmode="url" placeholder="https://…">
+        </label>
+        <label class="full">
+          <span class="lab">Notes (size, color, where to buy…)</span>
+          <textarea id="f_notes" maxlength="800"></textarea>
+        </label>
+        <label class="full">
+          <span class="lab">Your name (so we know who added it)</span>
+          <input id="f_by" maxlength="80" placeholder="Optional">
+        </label>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:16px">
+        <button class="btn btn-primary" id="saveBtn" type="submit" style="flex:1">Add to list</button>
+        <button class="btn btn-ghost" id="cancelBtn" type="button">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="list"><div class="card"><div class="empty">Loading the list…</div></div></div>
+
+  <div class="foot">
+    <a class="btn btn-ghost" href="/api/materials.csv">⬇ Download as spreadsheet</a>
+    <button class="btn btn-ghost" type="button" onclick="window.print()">🖨 Print</button>
+  </div>
+  <div class="foot-note">Anyone with this link can add to the list. Changes save instantly for everyone.</div>
+</div>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+let ITEMS = [], CATS = [], STATUSES = [], AREAS = [], editingId = null, busy = false;
+const UNASSIGNED = "Unassigned";
+
+function money(n) {
+  return "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function niceQty(n) {
+  return Number(n) % 1 === 0 ? String(Number(n)) : String(n);
+}
+function show(kind, html) {
+  const box = $("#msg");
+  box.className = "msg " + kind;
+  box.innerHTML = html;
+  box.hidden = false;
+  if (kind === "err") box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function clearMsg() { $("#msg").hidden = true; }
+
+async function api(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let data = {};
+  try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+  return data;
+}
+
+async function loadList(quiet) {
+  try {
+    const d = await api("GET", "/api/materials");
+    ITEMS = d.items || [];
+    CATS = d.categories || [];
+    STATUSES = d.statuses || [];
+    AREAS = d.areas || [];
+    if (d.show) $("#showName").textContent = d.show;
+    fillSelects();
+    render();
+  } catch (e) {
+    if (!quiet) show("err", esc(e.message));
+  }
+}
+
+function fillSelects() {
+  const cat = $("#f_category");
+  if (cat.options.length !== CATS.length) {
+    cat.innerHTML = CATS.map((c) => '<option value="' + esc(c) + '">' + esc(c) + "</option>").join("");
+  }
+  const st = $("#f_status");
+  if (st.options.length !== STATUSES.length) {
+    st.innerHTML = STATUSES.map((c) => '<option value="' + esc(c) + '">' + esc(c) + "</option>").join("");
+  }
+  $("#areas").innerHTML = AREAS.map((a) => "<option>" + esc(a) + "</option>").join("");
+}
+
+function visibleItems() {
+  const q = $("#q").value.trim().toLowerCase();
+  const sf = $("#statusFilter").value;
+  let out = ITEMS.filter((m) => {
+    if (sf && m.status !== sf) return false;
+    if (!q) return true;
+    return [m.name, m.notes, m.area, m.category, m.unit, m.added_by]
+      .filter(Boolean).join(" ").toLowerCase().includes(q);
+  });
+  const by = $("#sortBy").value;
+  const cmp = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    newest: (a, b) => (b.created_at || "").localeCompare(a.created_at || ""),
+    oldest: (a, b) => (a.created_at || "").localeCompare(b.created_at || ""),
+    qty: (a, b) => Number(b.qty || 0) - Number(a.qty || 0),
+    cost: (a, b) => Number(b.est_cost || 0) - Number(a.est_cost || 0),
+  }[by] || ((a, b) => a.name.localeCompare(b.name));
+  return out.sort(cmp);
+}
+
+function groupKey(m) {
+  const g = $("#groupBy").value;
+  if (g === "none") return "";
+  if (g === "category") return m.category || "Other";
+  if (g === "status") return m.status || "Needed";
+  return m.area || UNASSIGNED;
+}
+
+function render() {
+  const items = visibleItems();
+  renderSummary();
+
+  if (!items.length) {
+    $("#list").innerHTML = '<div class="card"><div class="empty">' +
+      (ITEMS.length ? "No items match that filter." : "Nothing on the list yet — add the first item.") +
+      "</div></div>";
+    return;
+  }
+
+  const groups = new Map();
+  for (const m of items) {
+    const k = groupKey(m);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(m);
+  }
+  // "Unassigned" sinks to the bottom; everything else alphabetical.
+  const keys = [...groups.keys()].sort((a, b) =>
+    a === UNASSIGNED ? 1 : b === UNASSIGNED ? -1 : a.localeCompare(b));
+
+  $("#list").innerHTML = keys.map((k) => {
+    const rows = groups.get(k);
+    const cost = rows.reduce((t, m) => t + (Number(m.est_cost) || 0), 0);
+    const head = k === "" ? "" :
+      '<div class="group-head"><h2>' + esc(k) + '</h2><span class="count">' +
+      rows.length + (rows.length === 1 ? " item" : " items") +
+      (cost ? " · " + money(cost) : "") + "</span></div>";
+    return '<section class="group">' + head + rows.map(itemHtml).join("") + "</section>";
+  }).join("");
+}
+
+function itemHtml(m) {
+  const done = m.status === "Purchased" || m.status === "Have it";
+  const tags = [];
+  if ($("#groupBy").value !== "area" && m.area && m.area !== UNASSIGNED)
+    tags.push('<span class="tag area">' + esc(m.area) + "</span>");
+  if ($("#groupBy").value !== "category" && m.category)
+    tags.push('<span class="tag">' + esc(m.category) + "</span>");
+  if (m.est_cost != null) tags.push('<span class="tag cost">' + money(m.est_cost) + "</span>");
+  if (m.added_by) tags.push('<span class="tag">added by ' + esc(m.added_by) + "</span>");
+
+  const note = m.notes ? '<div class="note">' + esc(m.notes) + "</div>" : "";
+  const link = m.link ? '<div class="note"><a href="' + esc(m.link) + '" target="_blank" rel="noopener noreferrer">' +
+    "View product ↗</a></div>" : "";
+
+  return '<article class="item' + (done ? " done" : "") + '" data-status="' + esc(m.status) +
+    '" data-id="' + esc(m.id) + '">' +
+    '<div class="qty">' + esc(niceQty(m.qty)) + (m.unit ? "<small>" + esc(m.unit) + "</small>" : "") + "</div>" +
+    '<div><p class="name">' + esc(m.name) + "</p>" + note + link +
+      (tags.length ? '<div class="tags">' + tags.join("") + "</div>" : "") + "</div>" +
+    '<div class="actions">' +
+      '<label class="sr" for="st-' + esc(m.id) + '">Status for ' + esc(m.name) + "</label>" +
+      '<select id="st-' + esc(m.id) + '" data-act="status">' +
+        STATUSES.map((s) => '<option' + (s === m.status ? " selected" : "") + ">" + esc(s) + "</option>").join("") +
+      "</select>" +
+      '<div class="row-btns">' +
+        '<button class="btn btn-ghost btn-sm" data-act="edit" type="button">Edit</button>' +
+        '<button class="btn btn-danger btn-sm" data-act="del" type="button">Remove</button>' +
+      "</div>" +
+    "</div></article>";
+}
+
+function renderSummary() {
+  const needed = ITEMS.filter((m) => m.status === "Needed");
+  const cost = ITEMS.reduce((t, m) => t + (Number(m.est_cost) || 0), 0);
+  const neededCost = needed.reduce((t, m) => t + (Number(m.est_cost) || 0), 0);
+  const bits = [
+    "<span><b>" + ITEMS.length + "</b> items on the list</span>",
+    "<span><b>" + needed.length + "</b> still needed</span>",
+  ];
+  if (cost) bits.push("<span>Estimated total <b>" + money(cost) + "</b>" +
+    (neededCost && neededCost !== cost ? " · <b>" + money(neededCost) + "</b> still to buy" : "") + "</span>");
+  $("#summary").innerHTML = bits.join("");
+}
+
+// ── Add / edit form ─────────────────────────────────────────────────────────
+function openForm(m) {
+  editingId = m ? m.id : null;
+  $("#formTitle").textContent = m ? "Edit item" : "Add an item";
+  $("#saveBtn").textContent = m ? "Save changes" : "Add to list";
+  $("#f_name").value = m ? m.name : "";
+  $("#f_qty").value = m ? m.qty : 1;
+  $("#f_unit").value = m ? (m.unit || "") : "";
+  $("#f_area").value = m && m.area !== UNASSIGNED ? m.area : "";
+  $("#f_category").value = m ? m.category : (CATS[0] || "Other");
+  $("#f_status").value = m ? m.status : "Needed";
+  $("#f_cost").value = m && m.est_cost != null ? m.est_cost : "";
+  $("#f_link").value = m ? (m.link || "") : "";
+  $("#f_notes").value = m ? (m.notes || "") : "";
+  $("#f_by").value = (m && m.added_by) || localStorage.getItem("afgm_who") || "";
+  $("#formCard").hidden = false;
+  clearMsg();
+  $("#formCard").scrollIntoView({ block: "center", behavior: "smooth" });
+  $("#f_name").focus();
+}
+function closeForm() { $("#formCard").hidden = true; editingId = null; }
+
+$("#addBtn").addEventListener("click", () => openForm(null));
+$("#cancelBtn").addEventListener("click", closeForm);
+
+$("#itemForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (busy) return;
+  const name = $("#f_name").value.trim();
+  if (!name) { show("err", "Please name the item."); $("#f_name").focus(); return; }
+  const by = $("#f_by").value.trim();
+  if (by) localStorage.setItem("afgm_who", by); else localStorage.removeItem("afgm_who");
+
+  const body = {
+    name,
+    qty: $("#f_qty").value === "" ? 1 : $("#f_qty").value,
+    unit: $("#f_unit").value,
+    area: $("#f_area").value,
+    category: $("#f_category").value,
+    status: $("#f_status").value,
+    est_cost: $("#f_cost").value,
+    link: $("#f_link").value.trim(),
+    notes: $("#f_notes").value,
+    added_by: by,
+  };
+  busy = true;
+  $("#saveBtn").disabled = true;
+  const label = $("#saveBtn").textContent;
+  $("#saveBtn").innerHTML = '<span class="spin"></span>Saving…';
+  try {
+    if (editingId) await api("PATCH", "/api/materials/" + encodeURIComponent(editingId), body);
+    else await api("POST", "/api/materials", body);
+    closeForm();
+    clearMsg();
+    await loadList();
+  } catch (err) {
+    show("err", esc(err.message));
+  } finally {
+    busy = false;
+    $("#saveBtn").disabled = false;
+    $("#saveBtn").textContent = label;
+  }
+});
+
+// ── Row actions ─────────────────────────────────────────────────────────────
+$("#list").addEventListener("change", async (e) => {
+  const sel = e.target.closest('select[data-act="status"]');
+  if (!sel) return;
+  const id = sel.closest(".item").dataset.id;
+  const status = sel.value;
+  try {
+    await api("PATCH", "/api/materials/" + encodeURIComponent(id), { status });
+    const m = ITEMS.find((x) => x.id === id);
+    if (m) m.status = status;
+    render();
+  } catch (err) { show("err", esc(err.message)); }
+});
+
+$("#list").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = btn.closest(".item").dataset.id;
+  const m = ITEMS.find((x) => x.id === id);
+  if (!m) return;
+  if (btn.dataset.act === "edit") { openForm(m); return; }
+  if (btn.dataset.act === "del") {
+    if (!confirm('Remove "' + m.name + '" from the list?')) return;
+    try {
+      await api("DELETE", "/api/materials/" + encodeURIComponent(id));
+      await loadList();
+      show("ok", "<span>Removed <b>" + esc(m.name) + "</b>.</span>" +
+        '<button class="btn btn-ghost btn-sm" id="undoBtn" type="button">Undo</button>');
+      const u = $("#undoBtn");
+      if (u) u.addEventListener("click", async () => {
+        try { await api("POST", "/api/materials/restore", { id }); clearMsg(); await loadList(); }
+        catch (err) { show("err", esc(err.message)); }
+      });
+    } catch (err) { show("err", esc(err.message)); }
+  }
+});
+
+// ── Filters ─────────────────────────────────────────────────────────────────
+for (const id of ["#q", "#groupBy", "#statusFilter", "#sortBy"]) {
+  $(id).addEventListener("input", render);
+}
+
+// Everyone is on the same list — refresh quietly, but never while someone is typing
+// into the add/edit form (that would clobber what they are in the middle of writing).
+setInterval(() => {
+  if (!$("#formCard").hidden || busy || document.hidden) return;
+  loadList(true);
+}, 20000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && $("#formCard").hidden) loadList(true);
+});
+
+loadList();
+</script>
+</body>
+</html>

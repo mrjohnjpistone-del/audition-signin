@@ -11,6 +11,11 @@ real time.
   timeslot: everyone who shows up fills in their details, availability, crew
   interest, ensemble willingness, emergency contact, and mailing-list opt-in.
   Built for kiosk use — after each person it resets for the next.
+- **Materials list** `/materials` — a shared set-build list for the show. Anyone
+  with the link can add items, mark them *Needed / Have it / Purchased*, and edit
+  or remove them. Group the list by **what it's for** (Jessup's desk, the judge's
+  box, the balcony…), by type of material, or by status; search it, sort it,
+  print it, or download it as a spreadsheet. No key, no login.
 - **Staff page** `/staff` — enter the access key, watch both the booked timeslots
   **and** the live walk-in sign-ins appear in real time. Add slots, export a CSV
   for each list, edit the event, rotate the key.
