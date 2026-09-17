@@ -8,17 +8,11 @@
 //   PUBLIC PAGE   GET  /                     the sign-up form (book a timeslot)
 //   SIGN-IN PAGE  GET  /signin               walk-in sign-in form (used at the audition)
 //   STAFF PAGE    GET  /staff                the roster (asks for the access key)
-//   MATERIALS     GET  /materials            shared set-build materials list (open to all)
 //
 //   PUBLIC API    GET  /api/public           event info + slot availability (no names)
 //                 POST /api/signup           claim a slot
 //                 POST /api/checkin          walk-in audition sign-in (no slot)
-//   MATERIALS API GET    /api/materials           the whole list + pick-lists
-//                 GET    /api/materials.csv       download the list as a spreadsheet
-//                 POST   /api/materials           add an item
-//                 PATCH  /api/materials/:id       edit an item (send only what changed)
-//                 DELETE /api/materials/:id       remove an item (kept in a small trash)
-//                 POST   /api/materials/restore   undo a removal
+//   MIRROR STORE  GET/PUT /api/blob/:name        key-gated backup copy for the materials app
 //   STAFF API     GET    /api/staff/roster        full roster w/ names + contacts + sign-ins
 //                 POST   /api/staff/slots         add slots (range-generate or list)
 //                 PATCH  /api/staff/slots/:id     edit a slot's date/time/duration
@@ -41,6 +35,9 @@ const DATA_DIR    = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE   = path.join(DATA_DIR, 'auditions.json');
 const PUBLIC_DIR  = path.join(__dirname, 'public');
 const DEFAULT_KEY = process.env.STAFF_KEY || 'GRZonptDh8QY';
+// Key for the mirror store (see /api/blob below). Kept separate from the staff key,
+// which anyone can rotate from the staff page. Unset = the mirror store is closed.
+const BLOB_KEY    = process.env.BLOB_KEY || '';
 // The venue's timezone (Morrilton, AR = US Central). Slot times are stored as the
 // venue's wall-clock; "today" must be computed in the venue's zone, not the server's
 // (Render runs in UTC — a naive new Date() would flip a day early each evening).
@@ -77,48 +74,7 @@ function freshStore() {
     //   training, conflict_none, conflict_weekdays[], conflict_dates[], conflict_notes,
     //   crew_interests[], emergency_name, emergency_phone, mailing_list, notes, created_at }
     checkins: [],
-    // Build/props materials list (the /materials page). Open to anyone with the link.
-    // { id, name, qty, unit, area, category, notes, link, est_cost, status, added_by,
-    //   created_at, updated_at }
-    materials: seedMaterials(),
-    materials_trash: [], // last few deleted items, so an accidental tap is recoverable
   };
-}
-
-// ── Materials list ───────────────────────────────────────────────────────────
-const MAT_CATEGORIES = ['Lumber', 'Hardware', 'Paint & Finish', 'Tools & Equipment',
-  'Props & Dressing', 'Fabric & Soft Goods', 'Electrical', 'Other'];
-const MAT_STATUSES = ['Needed', 'Have it', 'Purchased'];
-const MAT_UNASSIGNED = 'Unassigned';
-// Common set pieces/areas for this show — used as autocomplete suggestions only.
-// Anyone can type a new one; the list on screen always includes whatever is in use.
-const MAT_AREA_HINTS = ['Jessup\'s desk', 'Judge\'s box', 'Balcony', 'Courtroom', 'Barracks',
-  'Kaffee\'s office', 'Platform / deck', 'Stairs', 'Backdrop', 'General structure'];
-
-// The starting list Jay gave us. Only seeds a store that has never had materials.
-function seedMaterials() {
-  const now = new Date().toISOString();
-  const rows = [
-    ['Paint sprayer', 1, 'each', 'Tools & Equipment', '', ''],
-    ['Paint supplies (rollers, brushes, trays, drop cloths, tape)', 1, 'set', 'Paint & Finish', '', ''],
-    ['Paint', 5, 'gallons', 'Paint & Finish', 'Colors TBD', ''],
-    ['4x4x10 post', 5, 'each', 'Lumber', '', ''],
-    ['4x4x8 post', 2, 'each', 'Lumber', '', ''],
-    ['2x4x12 lumber', 12, 'each', 'Lumber', '', ''],
-    ['1x4x10 lumber', 10, 'each', 'Lumber', '', ''],
-    ['Luan plywood sheet', 10, 'sheets', 'Lumber', '', ''],
-    ['Stair stringer — 1.5 in. x 11.25 in. W x 3 ft. L', 4, 'each', 'Lumber', 'Ace item 5037383', 'https://www.acehardware.com/p/5037383'],
-    ['Stair stringer — 1.5 in. x 11.25 in. W x 4 ft. L', 2, 'each', 'Lumber', 'Ace item 5037383 (4 ft. length)', 'https://www.acehardware.com/p/5037383'],
-    ['Stair tread — 36 in. L x 11.25 in. W x 1.0625 in.', 9, 'each', 'Lumber', '', ''],
-    ['3 in. deck screws — hex or torx head', 1, 'box', 'Hardware', '', ''],
-    ['8 in. lag bolts', 1, 'box', 'Hardware', '', ''],
-    ['Chain — 2 ft.', 2, 'each', 'Hardware', '', ''],
-  ];
-  return rows.map(([name, qty, unit, category, notes, link]) => ({
-    id: crypto.randomUUID(), name, qty, unit, area: MAT_UNASSIGNED, category,
-    notes: notes || null, link: link || null, est_cost: null, status: 'Needed',
-    added_by: null, created_at: now, updated_at: now,
-  }));
 }
 function load() {
   try {
@@ -128,10 +84,6 @@ function load() {
     d.slots = Array.isArray(d.slots) ? d.slots : [];
     d.signups = Array.isArray(d.signups) ? d.signups : [];
     d.checkins = Array.isArray(d.checkins) ? d.checkins : [];
-    // Absent (an older data file) → seed the starting build list. Present → leave it alone,
-    // even if it is an empty array, so a list someone cleared out doesn't refill itself.
-    d.materials = Array.isArray(d.materials) ? d.materials : seedMaterials();
-    d.materials_trash = Array.isArray(d.materials_trash) ? d.materials_trash : [];
     return d;
   } catch (e) {
     return freshStore();
@@ -164,6 +116,21 @@ function sendJson(res, code, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(body);
+}
+// Raw request text with a caller-set cap — the mirror store below takes a whole
+// JSON document, far larger than any form post.
+function readText(req, cap) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > cap) { reject(new Error('too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
 }
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -207,72 +174,6 @@ function allowCheckin(ip) {
   arr.push(now); checkinHits.set(ip, arr);
   if (checkinHits.size > 20000) for (const [k, v] of checkinHits) if (v.every((t) => now - t > win)) checkinHits.delete(k);
   return true;
-}
-
-// ── Materials rate limit: a whole build crew may share one wifi, so this is the
-// generous kiosk-style limit, not the signup one. 400 writes / hour / IP.
-const matHits = new Map();
-function allowMaterial(ip) {
-  const now = Date.now(), win = 3600000, max = 400;
-  const arr = (matHits.get(ip) || []).filter((t) => now - t < win);
-  if (arr.length >= max) { matHits.set(ip, arr); return false; }
-  arr.push(now); matHits.set(ip, arr);
-  if (matHits.size > 20000) for (const [k, v] of matHits) if (v.every((t) => now - t > win)) matHits.delete(k);
-  return true;
-}
-
-// Read the fields of a materials item off a request body. `base` supplies the
-// current values on an edit, so a PATCH can send only what changed.
-function readMaterial(b, base) {
-  const cur = base || {};
-  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
-  const out = {};
-  out.name = has('name') ? s(b.name, 160) : cur.name;
-  out.unit = has('unit') ? s(b.unit, 40) : (cur.unit || '');
-  out.area = has('area') ? (s(b.area, 80) || MAT_UNASSIGNED) : (cur.area || MAT_UNASSIGNED);
-  out.notes = has('notes') ? (s(b.notes, 800) || null) : (cur.notes || null);
-  out.added_by = has('added_by') ? (s(b.added_by, 80) || null) : (cur.added_by || null);
-
-  if (has('category')) {
-    const c = s(b.category, 40);
-    out.category = MAT_CATEGORIES.includes(c) ? c : 'Other';
-  } else out.category = cur.category || 'Other';
-
-  if (has('status')) {
-    const st = s(b.status, 20);
-    out.status = MAT_STATUSES.includes(st) ? st : 'Needed';
-  } else out.status = cur.status || 'Needed';
-
-  if (has('qty')) {
-    const n = Number(b.qty);
-    out.qty = Number.isFinite(n) && n > 0 ? Math.min(Math.round(n * 100) / 100, 100000) : 1;
-  } else out.qty = cur.qty == null ? 1 : cur.qty;
-
-  if (has('est_cost')) {
-    const n = Number(b.est_cost);
-    out.est_cost = b.est_cost === '' || b.est_cost == null || !Number.isFinite(n) || n < 0
-      ? null : Math.min(Math.round(n * 100) / 100, 1000000);
-  } else out.est_cost = cur.est_cost == null ? null : cur.est_cost;
-
-  if (has('link')) {
-    const raw = s(b.link, 500);
-    // Only http(s) links — never javascript:/data: URLs, which the page renders as anchors.
-    out.link = /^https?:\/\/\S+$/i.test(raw) ? raw : null;
-  } else out.link = cur.link || null;
-
-  return out;
-}
-
-// Areas offered as autocomplete: the suggestions plus every area actually in use.
-function materialAreas() {
-  const seen = new Set(MAT_AREA_HINTS);
-  for (const m of store.materials) if (m.area && m.area !== MAT_UNASSIGNED) seen.add(m.area);
-  return [...seen].sort((a, b) => a.localeCompare(b));
-}
-
-function csvCell(v) {
-  const t = v == null ? '' : String(v);
-  return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
 }
 
 // Normalize a submitted list of strings against an allowed set (checkboxes / multi-select).
@@ -320,9 +221,6 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && (p === '/staff' || p === '/admin')) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       return sendFile(res, 'staff.html', 'text/html; charset=utf-8');
-    }
-    if (method === 'GET' && (p === '/materials' || p === '/build')) {
-      return sendFile(res, 'materials.html', 'text/html; charset=utf-8');
     }
     if (method === 'GET' && p === '/health') return sendJson(res, 200, { ok: true });
 
@@ -407,84 +305,43 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, name });
     }
 
-    // ── MATERIALS API (open — anyone with the link can read and add) ────────
-    if (method === 'GET' && p === '/api/materials') {
-      return sendJson(res, 200, {
-        items: store.materials,
-        categories: MAT_CATEGORIES,
-        statuses: MAT_STATUSES,
-        areas: materialAreas(),
-        show: store.settings.title.replace(/\s*—.*$/, ''),
-      });
-    }
+    // ── MIRROR STORE (one JSON blob per name, key-gated) ────────────────────
+    // The set-build materials list runs as its own service on a free plan, whose
+    // filesystem is wiped every time it sleeps. This service has a persistent disk,
+    // so it holds that list's backup copy: the materials app PUTs its whole store
+    // here after every change and GETs it back when it boots with an empty disk.
+    // Nothing else reads or writes these files, and no page links to them.
+    if (p.startsWith('/api/blob/')) {
+      const name = p.slice('/api/blob/'.length).replace(/[^a-z0-9_-]/gi, '').slice(0, 40);
+      const provided = req.headers['x-staff-key'] || url.searchParams.get('key') || '';
+      if (!BLOB_KEY || !name || provided !== BLOB_KEY)
+        return sendJson(res, 401, { error: 'Invalid key.' });
+      const file = path.join(DATA_DIR, 'blob-' + name + '.json');
 
-    if (method === 'GET' && p === '/api/materials.csv') {
-      const cols = ['Item', 'Qty', 'Unit', 'For', 'Category', 'Status', 'Est. cost', 'Link', 'Notes', 'Added by', 'Added'];
-      const lines = [cols.join(',')];
-      for (const m of store.materials) {
-        lines.push([m.name, m.qty, m.unit, m.area, m.category, m.status,
-          m.est_cost == null ? '' : m.est_cost, m.link, m.notes, m.added_by,
-          (m.created_at || '').slice(0, 10)].map(csvCell).join(','));
+      if (method === 'GET') {
+        let text;
+        try { text = fs.readFileSync(file, 'utf8'); }
+        catch (e) { return sendJson(res, 404, { error: 'Nothing stored under that name yet.' }); }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(text);
       }
-      res.writeHead(200, {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="materials-list.csv"',
-        'Cache-Control': 'no-store',
-      });
-      return res.end(lines.join('\n'));
-    }
 
-    if (method === 'POST' && p === '/api/materials') {
-      if (!allowMaterial(clientIp(req)))
-        return sendJson(res, 429, { error: 'Too many changes from this network right now. Please wait a moment.' });
-      if (store.materials.length >= 2000)
-        return sendJson(res, 409, { error: 'This list is full (2,000 items). Remove something before adding more.' });
-      const f = readMaterial(await readBody(req), null);
-      if (!f.name) return sendJson(res, 400, { error: 'Please name the item.' });
-      const now = new Date().toISOString();
-      const item = Object.assign({ id: uuid() }, f, { created_at: now, updated_at: now });
-      store.materials.push(item);
-      save();
-      return sendJson(res, 200, { ok: true, item });
-    }
+      if (method === 'PUT') {
+        const text = await readText(req, 4 * 1024 * 1024);
+        try { JSON.parse(text); } catch (e) { return sendJson(res, 400, { error: 'That is not valid JSON.' }); }
+        try {
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+          const tmp = file + '.tmp';
+          fs.writeFileSync(tmp, text);
+          fs.renameSync(tmp, file); // atomic replace, same as the roster's own writes
+        } catch (e) {
+          console.error('blob write failed:', e.message);
+          return sendJson(res, 500, { error: 'Could not store it.' });
+        }
+        return sendJson(res, 200, { ok: true, bytes: Buffer.byteLength(text) });
+      }
 
-    if (method === 'PATCH' && p.startsWith('/api/materials/')) {
-      if (!allowMaterial(clientIp(req)))
-        return sendJson(res, 429, { error: 'Too many changes from this network right now. Please wait a moment.' });
-      const id = decodeURIComponent(p.slice('/api/materials/'.length));
-      const item = store.materials.find((m) => m.id === id);
-      if (!item) return sendJson(res, 404, { error: 'That item is no longer on the list.' });
-      const f = readMaterial(await readBody(req), item);
-      if (!f.name) return sendJson(res, 400, { error: 'Please name the item.' });
-      Object.assign(item, f, { updated_at: new Date().toISOString() });
-      save();
-      return sendJson(res, 200, { ok: true, item });
-    }
-
-    if (method === 'DELETE' && p.startsWith('/api/materials/')) {
-      if (!allowMaterial(clientIp(req)))
-        return sendJson(res, 429, { error: 'Too many changes from this network right now. Please wait a moment.' });
-      const id = decodeURIComponent(p.slice('/api/materials/'.length));
-      const i = store.materials.findIndex((m) => m.id === id);
-      if (i === -1) return sendJson(res, 404, { error: 'That item is no longer on the list.' });
-      const [gone] = store.materials.splice(i, 1);
-      // Keep the last 25 removals so an accidental tap on a phone can be undone.
-      store.materials_trash.unshift(gone);
-      store.materials_trash = store.materials_trash.slice(0, 25);
-      save();
-      return sendJson(res, 200, { ok: true, id });
-    }
-
-    if (method === 'POST' && p === '/api/materials/restore') {
-      const b = await readBody(req);
-      const id = s(b.id, 60);
-      const i = store.materials_trash.findIndex((m) => m.id === id);
-      if (i === -1) return sendJson(res, 404, { error: 'Nothing left to undo for that item.' });
-      const [back] = store.materials_trash.splice(i, 1);
-      back.updated_at = new Date().toISOString();
-      store.materials.push(back);
-      save();
-      return sendJson(res, 200, { ok: true, item: back });
+      return sendJson(res, 405, { error: 'Use GET or PUT.' });
     }
 
     // ── STAFF API (all require the key) ─────────────────────────────────────
