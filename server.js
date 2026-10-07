@@ -581,16 +581,20 @@ function byLocal(a, b) { return a.slot_local < b.slot_local ? -1 : a.slot_local 
 
 // ─── KEEP THE FREE SERVICES AWAKE ───────────────────────────────────────────
 // Render parks a free service after about fifteen idle minutes, so the first
-// person to open an RSVP or Test Drive link waits roughly half a minute staring
-// at a blank browser while it gets up. This service is on a paid plan and never
-// sleeps, so it knocks on the free one's door often enough that it never dozes
-// off during the hours people actually click those links.
+// person to open the set build materials link waits roughly half a minute
+// staring at a blank browser while it gets up. This service is on a paid plan
+// and never sleeps, so it knocks on the free one's door often enough that it
+// never dozes off during the hours people actually click that link.
+//
+// The RSVP and Test Ride / Test Drive service moved to a paid plan and no
+// longer sleeps, so knocking on its door bought nothing. The whole window now
+// goes to the materials list, which is the only free service left.
 //
 // It is a window, not around the clock, on purpose: every free service on the
 // account draws from one shared pool of 750 instance-hours a month. Awake 17
-// hours a day is about 527 of them, which leaves room for the materials list.
-// (Awake 24/7 would be about 730 and would starve everything else.)
-const WARM_URLS = (process.env.WARM_URLS || 'https://afgm-rsvp.onrender.com/health')
+// hours a day is about 527 of them, which stays inside the pool. (Awake 24/7
+// would be about 730 and would leave no room for anything else.)
+const WARM_URLS = (process.env.WARM_URLS || 'https://afgm-materials.onrender.com/health')
   .split(',').map((u) => u.trim()).filter(Boolean);
 const WARM_TZ    = process.env.WARM_TZ || 'America/Chicago';
 const WARM_FROM  = Number(process.env.WARM_FROM || 6);   // first hour of the window
