@@ -222,7 +222,7 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       return sendFile(res, 'staff.html', 'text/html; charset=utf-8');
     }
-    if (method === 'GET' && p === '/health') return sendJson(res, 200, { ok: true });
+    if (method === 'GET' && p === '/health') return sendJson(res, 200, { ok: true, keep_warm: warmLast });
 
     // ── PUBLIC API ──────────────────────────────────────────────────────────
     if (method === 'GET' && p === '/api/public') {
@@ -579,10 +579,65 @@ const server = http.createServer(async (req, res) => {
 
 function byLocal(a, b) { return a.slot_local < b.slot_local ? -1 : a.slot_local > b.slot_local ? 1 : 0; }
 
+// ─── KEEP THE FREE SERVICES AWAKE ───────────────────────────────────────────
+// Render parks a free service after about fifteen idle minutes, so the first
+// person to open an RSVP or Test Drive link waits roughly half a minute staring
+// at a blank browser while it gets up. This service is on a paid plan and never
+// sleeps, so it knocks on the free one's door often enough that it never dozes
+// off during the hours people actually click those links.
+//
+// It is a window, not around the clock, on purpose: every free service on the
+// account draws from one shared pool of 750 instance-hours a month. Awake 17
+// hours a day is about 527 of them, which leaves room for the materials list.
+// (Awake 24/7 would be about 730 and would starve everything else.)
+const WARM_URLS = (process.env.WARM_URLS || 'https://afgm-rsvp.onrender.com/health')
+  .split(',').map((u) => u.trim()).filter(Boolean);
+const WARM_TZ    = process.env.WARM_TZ || 'America/Chicago';
+const WARM_FROM  = Number(process.env.WARM_FROM || 6);   // first hour of the window
+const WARM_UNTIL = Number(process.env.WARM_UNTIL || 23); // first hour outside it
+const WARM_EVERY = 10 * 60 * 1000;                       // comfortably inside Render's 15
+let warmLast = null;
+
+// Render's clock is UTC; the window is meant in Arkansas time, so ask for the hour there.
+function warmHourHere() {
+  const s = new Intl.DateTimeFormat('en-US', { timeZone: WARM_TZ, hour: 'numeric', hour12: false })
+    .format(new Date());
+  return Number(s) % 24;
+}
+
+async function keepWarm() {
+  const hour = warmHourHere();
+  if (!WARM_URLS.length || hour < WARM_FROM || hour >= WARM_UNTIL) {
+    warmLast = { at: new Date().toISOString(), hour, skipped: 'outside window' };
+    return;
+  }
+  const pinged = [];
+  for (const url of WARM_URLS) {
+    const t0 = Date.now();
+    try {
+      // A sleeping service can take the better part of a minute to boot, so wait it out.
+      const stop = AbortSignal.timeout ? AbortSignal.timeout(90000) : undefined;
+      const r = await fetch(url, { signal: stop, headers: { 'user-agent': 'afgm-keepwarm' } });
+      pinged.push({ url, status: r.status, ms: Date.now() - t0 });
+    } catch (err) {
+      pinged.push({ url, error: (err && err.message) || 'failed', ms: Date.now() - t0 });
+    }
+  }
+  warmLast = { at: new Date().toISOString(), hour, pinged };
+  const slow = pinged.filter((x) => x.error || x.ms > 5000);
+  if (slow.length) console.log('keep-warm:', JSON.stringify(slow));
+}
+
+
 server.listen(PORT, () => {
   console.log(`Audition Sign-In running on http://localhost:${PORT}`);
   console.log(`  Public form : http://localhost:${PORT}/`);
   console.log(`  Sign-in form: http://localhost:${PORT}/signin`);
   console.log(`  Staff roster: http://localhost:${PORT}/staff   (key: ${store.settings.staff_key})`);
   console.log(`  Data file   : ${DATA_FILE}`);
+  if (WARM_URLS.length) {
+    console.log(`  Keeping awake: ${WARM_URLS.join(', ')}  (${WARM_FROM}:00-${WARM_UNTIL}:00 ${WARM_TZ})`);
+    keepWarm();
+    setInterval(keepWarm, WARM_EVERY);
+  }
 });
